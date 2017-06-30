@@ -122,7 +122,7 @@ def write_inconsistent(log, inconsistent, iterations):
         ("`%s`" % markdown_adjust(subtest)) if subtest else "",
         err_string(results, iterations),
         ("`%s`" % markdown_adjust(";".join(messages))) if len(messages) else "")
-               for test, subtest, results, messages in inconsistent]
+        for test, subtest, results, messages in inconsistent]
     table(["Test", "Subtest", "Results", "Messages"], strings, log)
 
 
@@ -141,7 +141,7 @@ def write_results(log, results, iterations, use_details=False):
         if use_details:
             log("<details>\n")
             log('<summary><a href="%s/%s%s">%s</a></summary>\n\n' %
-                        (baseurl, pr_number, test_name, test_name))
+                (baseurl, pr_number, test_name, test_name))
         else:
             log("### %s ###" % test_name)
         strings = [("", err_string(test["status"], iterations), "")]
@@ -150,7 +150,7 @@ def write_results(log, results, iterations, use_details=False):
             ("`%s`" % markdown_adjust(subtest_name)) if subtest else "",
             err_string(subtest["status"], iterations),
             ("`%s`" % markdown_adjust(';'.join(subtest["messages"]))) if len(subtest["messages"]) else "")
-                        for subtest_name, subtest in test["subtests"].items()))
+            for subtest_name, subtest in test["subtests"].items()))
         table(["Subtest", "Results", "Messages"], strings, log)
         if use_details:
             log("</details>\n")
