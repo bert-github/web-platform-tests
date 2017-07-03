@@ -301,15 +301,14 @@ def run(venv, wpt_args, **kwargs):
             version = "unknown (error: %s)" % e
         logger.info("Using browser at version %s", version)
 
-        if files_changed:
-            logger.debug("Files changed:\n%s" % "".join(" * %s\n" % item for item in files_changed))
+        if tests_changed:
+            logger.debug("Tests changed:\n%s" % "".join(" * %s\n" % item for item in tests_changed))
 
         if files_affected:
             logger.debug("Affected tests:\n%s" % "".join(" * %s\n" % item for item in files_affected))
 
 
     with TravisFold("running_tests"):
-        print(wpt_kwargs["repeat"])
         logger.info("Starting tests")
 
 
