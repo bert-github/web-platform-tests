@@ -295,12 +295,6 @@ def run(venv, wpt_args, **kwargs):
 
         wpt_kwargs = setup_wptrunner(venv, **wpt_kwargs)
 
-        try:
-            version = browser.version(args.root)
-        except Exception as e:
-            version = "unknown (error: %s)" % e
-        logger.info("Using browser at version %s", version)
-
         if tests_changed:
             logger.debug("Tests changed:\n%s" % "".join(" * %s\n" % item for item in tests_changed))
 

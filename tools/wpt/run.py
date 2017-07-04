@@ -133,9 +133,9 @@ class BrowserSetup(object):
             elif resp == "n":
                 return False
 
-    def install(self):
+    def install(self, venv):
         if self.prompt_install(self.name):
-            self.install_path = self.browser.install()
+            self.install_path = self.browser.install(venv.path)
 
     def setup(self, kwargs):
         self.venv.install_requirements(os.path.join(wpt_root, "tools", "wptrunner", self.browser.requirements))
@@ -238,7 +238,7 @@ class Edge(BrowserSetup):
     name = "edge"
     browser_cls = browser.Edge
 
-    def install(self):
+    def install(self, venv):
         raise NotImplementedError
 
     def setup_kwargs(self, kwargs):
@@ -259,11 +259,10 @@ class Sauce(BrowserSetup):
     name = "sauce"
     browser_cls = browser.Sauce
 
-    def install(self):
+    def install(self, venv):
         raise NotImplementedError
 
     def setup_kwargs(self, kwargs):
-        product, browser = kwargs["product"].split(":")
         kwargs["test_types"] = ["testharness", "reftest"]
 
 
@@ -271,7 +270,7 @@ class Servo(BrowserSetup):
     name = "servo"
     browser_cls = browser.Servo
 
-    def install(self):
+    def install(self, venv):
         raise NotImplementedError
 
     def setup_kwargs(self, kwargs):
@@ -312,10 +311,10 @@ def setup_wptrunner(venv, prompt=True, install=False, **kwargs):
 
     setup_cls = product_setup[product](venv, prompt)
 
-    setup_cls.setup(kwargs)
-
     if install:
-        setup_cls.install()
+        setup_cls.install(venv)
+
+    setup_cls.setup(kwargs)
 
     wptcommandline.check_args(kwargs)
 
