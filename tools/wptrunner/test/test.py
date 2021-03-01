@@ -1,15 +1,12 @@
-import ConfigParser
+from __future__ import print_function
 import argparse
-import json
 import os
 import sys
-import tempfile
-import threading
-import time
-from StringIO import StringIO
 
-from mozlog import structuredlog, reader
-from mozlog.handlers import BaseHandler, StreamHandler, StatusHandler
+from configparser import ConfigParser
+
+from mozlog import structuredlog
+from mozlog.handlers import BaseHandler, StreamHandler
 from mozlog.formatters import MachFormatter
 from wptrunner import wptcommandline, wptrunner
 
@@ -62,7 +59,7 @@ def test_settings():
     }
 
 def read_config():
-    parser = ConfigParser.ConfigParser()
+    parser = ConfigParser()
     parser.read("test.cfg")
 
     rv = {"general":{},
@@ -73,7 +70,7 @@ def read_config():
     # This only allows one product per whatever for now
     for product in parser.sections():
         if product != "general":
-            dest = rv["products"][product] = {}
+            rv["products"][product] = {}
             for key, value in parser.items(product):
                 rv["products"][product][key] = value
 
@@ -87,7 +84,7 @@ def run_tests(product, kwargs):
 
 def settings_to_argv(settings):
     rv = []
-    for name, value in settings.iteritems():
+    for name, value in settings.items():
         key = "--%s" % name
         if not value:
             rv.append(key)
@@ -113,7 +110,7 @@ def run(config, args):
 
     logger.suite_start(tests=[])
 
-    for product, product_settings in config["products"].iteritems():
+    for product, product_settings in config["products"].items():
         if args.product and product not in args.product:
             continue
 
@@ -156,8 +153,9 @@ def main():
         run(config, args)
     except Exception:
         if args.pdb:
-            import pdb, traceback
-            print traceback.format_exc()
+            import pdb
+            import traceback
+            print(traceback.format_exc())
             pdb.post_mortem()
         else:
             raise

@@ -1,6 +1,6 @@
 'use strict';
 
-var gCSSProperties = {
+const gCSSProperties1 = {
   'align-content': {
     // https://drafts.csswg.org/css-align/#propdef-align-content
     types: [
@@ -146,7 +146,7 @@ var gCSSProperties = {
     // https://drafts.csswg.org/css-backgrounds-3/#border-bottom-width
     types: [ 'length' ],
     setup: t => {
-      var element = createElement(t);
+      const element = createElement(t);
       element.style.borderBottomStyle = 'solid';
       return element;
     }
@@ -190,19 +190,17 @@ var gCSSProperties = {
   'border-image-outset': {
     // https://drafts.csswg.org/css-backgrounds-3/#border-image-outset
     types: [
-      { type: 'discrete', options: [ [ '1 2 3 4', '5 6 7 8' ] ] }
     ]
   },
   'border-image-repeat': {
     // https://drafts.csswg.org/css-backgrounds-3/#border-image-repeat
     types: [
-      { type: 'discrete', options: [ [ 'stretch stretch', 'repeat repeat' ] ] }
+      { type: 'discrete', options: [ [ 'stretch repeat', 'round space' ] ] }
     ]
   },
   'border-image-slice': {
     // https://drafts.csswg.org/css-backgrounds-3/#border-image-slice
     types: [
-      { type: 'discrete', options: [ [ '1 2 3 4', '5 6 7 8' ] ] }
     ]
   },
   'border-image-source': {
@@ -216,7 +214,6 @@ var gCSSProperties = {
   'border-image-width': {
     // https://drafts.csswg.org/css-backgrounds-3/#border-image-width
     types: [
-      { type: 'discrete', options: [ [ '1 2 3 4', '5 6 7 8' ] ] }
     ]
   },
   'border-left-color': {
@@ -233,7 +230,7 @@ var gCSSProperties = {
     // https://drafts.csswg.org/css-backgrounds-3/#border-left-width
     types: [ 'length' ],
     setup: t => {
-      var element = createElement(t);
+      const element = createElement(t);
       element.style.borderLeftStyle = 'solid';
       return element;
     }
@@ -252,7 +249,7 @@ var gCSSProperties = {
     // https://drafts.csswg.org/css-backgrounds-3/#border-right-width
     types: [ 'length' ],
     setup: t => {
-      var element = createElement(t);
+      const element = createElement(t);
       element.style.borderRightStyle = 'solid';
       return element;
     }
@@ -285,7 +282,7 @@ var gCSSProperties = {
     // https://drafts.csswg.org/css-backgrounds-3/#border-top-width
     types: [ 'length' ],
     setup: t => {
-      var element = createElement(t);
+      const element = createElement(t);
       element.style.borderTopStyle = 'solid';
       return element;
     }
@@ -361,13 +358,13 @@ var gCSSProperties = {
   'color-interpolation': {
     // https://svgwg.org/svg2-draft/painting.html#ColorInterpolationProperty
     types: [
-      { type: 'discrete', options: [ [ 'linearRGB', 'auto' ] ] }
+      { type: 'discrete', options: [ [ 'linearrgb', 'auto' ] ] }
     ]
   },
   'color-interpolation-filters': {
     // https://drafts.fxtf.org/filters-1/#propdef-color-interpolation-filters
     types: [
-      { type: 'discrete', options: [ [ 'sRGB', 'linearRGB' ] ] }
+      { type: 'discrete', options: [ [ 'srgb', 'linearrgb' ] ] }
     ]
   },
   'column-count': {
@@ -402,7 +399,7 @@ var gCSSProperties = {
     // https://drafts.csswg.org/css-multicol/#propdef-column-rule-width
     types: [ 'length' ],
     setup: t => {
-      var element = createElement(t);
+      const element = createElement(t);
       element.style.columnRuleStyle = 'solid';
       return element;
     }
@@ -412,21 +409,6 @@ var gCSSProperties = {
     types: [ 'length',
       { type: 'discrete', options: [ [ 'auto', '1px' ] ] }
     ]
-  },
-  'contain': {
-    // https://drafts.csswg.org/css-containment/#propdef-contain
-    types: [
-      { type: 'discrete', options: [ [ 'strict', 'none' ] ] }
-    ]
-  },
-  'content': {
-    // https://drafts.csswg.org/css-content-3/#propdef-content
-    types: [
-      { type: 'discrete', options: [ [ '"a"', '"b"' ] ] }
-    ],
-    setup: t => {
-      return createPseudo(t, 'before');
-    }
   },
   'counter-increment': {
     // https://drafts.csswg.org/css-lists-3/#propdef-counter-increment
@@ -444,12 +426,6 @@ var gCSSProperties = {
     // https://drafts.csswg.org/css2/ui.html#propdef-cursor
     types: [
       { type: 'discrete', options: [ [ 'pointer', 'wait' ] ] }
-    ]
-  },
-  'direction': {
-    // https://drafts.csswg.org/css-writing-modes-3/#propdef-direction
-    types: [
-      { type: 'discrete', options: [ [ 'ltr', 'rtl' ] ] }
     ]
   },
   'dominant-baseline': {
@@ -529,8 +505,8 @@ var gCSSProperties = {
     ]
   },
   'font-stretch': {
-    // https://drafts.csswg.org/css-fonts-3/#propdef-font-stretch
-    types: [ 'fontStretch' ]
+    // https://drafts.csswg.org/css-fonts-4/#propdef-font-stretch
+    types: [ 'percentage' ]
   },
   'font-style': {
     // https://drafts.csswg.org/css-fonts/#propdef-font-style
@@ -623,7 +599,7 @@ var gCSSProperties = {
     types: [
       'fontVariationSettings',
       { type: 'discrete',
-        options: [ ['"wght" 1.1, "wdth" 1', '"wdth" 5'],
+        options: [ ['"wdth" 1, "wght" 1.1', '"wdth" 5'],
                    ['"wdth" 5', 'normal']
                  ] },
     ]
@@ -691,18 +667,6 @@ var gCSSProperties = {
       { type: 'discrete', options: [ [ '". . a b" ". .a b"', 'none' ] ] }
     ]
   },
-  'grid-template-columns': {
-    // https://drafts.csswg.org/css-template/#grid-template-columns
-    types: [
-      { type: 'discrete', options: [ [ '1px', '5px' ] ] }
-    ]
-  },
-  'grid-template-rows': {
-    // https://drafts.csswg.org/css-template/#grid-template-rows
-    types: [
-      { type: 'discrete', options: [ [ '1px', '5px' ] ] }
-    ]
-  },
   'height': {
     // https://drafts.csswg.org/css21/visudet.html#propdef-height
     types: [
@@ -711,13 +675,13 @@ var gCSSProperties = {
   'hyphens': {
     // https://drafts.csswg.org/css-text-3/#propdef-hyphens
     types: [
-      { type: 'discrete', options: [ [ 'manual', 'auto' ] ] }
+      { type: 'discrete', options: [ [ 'manual', 'none' ] ] }
     ]
   },
   'image-orientation': {
     // https://drafts.csswg.org/css-images-3/#propdef-image-orientation
     types: [
-      { type: 'discrete', options: [ [ '0deg', '90deg' ] ] }
+      { type: 'discrete', options: [ [ 'none', 'from-image' ] ] }
     ]
   },
   'image-rendering': {
@@ -737,6 +701,9 @@ var gCSSProperties = {
       { type: 'discrete', options: [ [ '1 2', '3 4' ] ] }
     ]
   },
+};
+
+const gCSSProperties2 = {
   'inline-size': {
     // https://drafts.csswg.org/css-logical-props/#propdef-inline-size
     types: [
@@ -751,19 +718,19 @@ var gCSSProperties = {
   'justify-content': {
     // https://drafts.csswg.org/css-align/#propdef-justify-content
     types: [
-      { type: 'discrete', options: [ [ 'baseline', 'last baseline' ] ] }
+      { type: 'discrete', options: [ [ 'start', 'end' ] ] }
     ]
   },
   'justify-items': {
     // https://drafts.csswg.org/css-align/#propdef-justify-items
     types: [
-      { type: 'discrete', options: [ [ 'baseline', 'last baseline' ] ] }
+      { type: 'discrete', options: [ [ 'start', 'end' ] ] }
     ]
   },
   'justify-self': {
     // https://drafts.csswg.org/css-align/#propdef-justify-self
     types: [
-      { type: 'discrete', options: [ [ 'baseline', 'last baseline' ] ] }
+      { type: 'discrete', options: [ [ 'start', 'end' ] ] }
     ]
   },
   'left': {
@@ -997,23 +964,32 @@ var gCSSProperties = {
     types: [
     ]
   },
-  'offset-block-end': {
-    // https://drafts.csswg.org/css-logical-props/#propdef-offset-block-end
+  'inset-block-end': {
+    // https://drafts.csswg.org/css-logical-props/#propdef-inset-block-end
     types: [
     ]
   },
-  'offset-block-start': {
-    // https://drafts.csswg.org/css-logical-props/#propdef-offset-block-start
+  'inset-block-start': {
+    // https://drafts.csswg.org/css-logical-props/#propdef-inset-block-start
     types: [
     ]
   },
-  'offset-inline-end': {
-    // https://drafts.csswg.org/css-logical-props/#propdef-offset-inline-end
+  'inset-inline-end': {
+    // https://drafts.csswg.org/css-logical-props/#propdef-inset-inline-end
     types: [
     ]
   },
-  'offset-inline-start': {
-    // https://drafts.csswg.org/css-logical-props/#propdef-offset-inline-start
+  'inset-inline-start': {
+    // https://drafts.csswg.org/css-logical-props/#propdef-inset-inline-start
+    types: [
+    ]
+  },
+  'offset-distance': {
+    // https://drafts.fxtf.org/motion-1/#offset-distance-property
+    types: [ 'lengthPercentageOrCalc' ]
+  },
+  'offset-path': {
+    // https://drafts.fxtf.org/motion-1/#offset-path-property
     types: [
     ]
   },
@@ -1044,7 +1020,7 @@ var gCSSProperties = {
     // https://drafts.csswg.org/css-ui-3/#propdef-outline-width
     types: [ 'length' ],
     setup: t => {
-      var element = createElement(t);
+      const element = createElement(t);
       element.style.outlineStyle = 'solid';
       return element;
     }
@@ -1052,12 +1028,6 @@ var gCSSProperties = {
   'overflow': {
     // https://drafts.csswg.org/css-overflow/#propdef-overflow
     types: [
-    ]
-  },
-  'overflow-clip-box': {
-    // https://developer.mozilla.org/en/docs/Web/CSS/overflow-clip-box
-    types: [
-      { type: 'discrete', options: [ [ 'padding-box', 'content-box' ] ] }
     ]
   },
   'overflow-wrap': {
@@ -1200,18 +1170,6 @@ var gCSSProperties = {
       { type: 'discrete', options: [ [ 'auto', 'smooth' ] ] }
     ]
   },
-  'scroll-snap-type-x': {
-    // https://developer.mozilla.org/en/docs/Web/CSS/scroll-snap-type-x
-    types: [
-      { type: 'discrete', options: [ [ 'mandatory', 'proximity' ] ] }
-    ]
-  },
-  'scroll-snap-type-y': {
-    // https://developer.mozilla.org/en/docs/Web/CSS/scroll-snap-type-y
-    types: [
-      { type: 'discrete', options: [ [ 'mandatory', 'proximity' ] ] }
-    ]
-  },
   'shape-outside': {
     // http://dev.w3.org/csswg/css-shapes/#propdef-shape-outside
     types: [
@@ -1243,7 +1201,7 @@ var gCSSProperties = {
     // https://svgwg.org/svg2-draft/painting.html#StrokeDasharrayProperty
     types: [
       'dasharray',
-      { type: 'discrete', options: [ [ 'none', '10, 20' ] ] }
+      { type: 'discrete', options: [ [ 'none', '10px, 20px' ] ] }
     ]
   },
   'stroke-dashoffset': {
@@ -1303,12 +1261,6 @@ var gCSSProperties = {
       { type: 'discrete', options: [ [ 'middle', 'end' ] ] }
     ]
   },
-  'text-combine-upright': {
-    // https://drafts.csswg.org/css-writing-modes-3/#propdef-text-combine-upright
-    types: [
-      { type: 'discrete', options: [ [ 'all', 'none' ] ] }
-    ]
-  },
   'text-decoration-color': {
     // https://drafts.csswg.org/css-text-decor-3/#propdef-text-decoration-color
     types: [ 'color' ]
@@ -1338,18 +1290,12 @@ var gCSSProperties = {
   'text-emphasis-style': {
     // http://dev.w3.org/csswg/css-text-decor-3/#propdef-text-emphasis-style
     types: [
-      { type: 'discrete', options: [ [ 'filled circle', 'open dot' ] ] }
+      { type: 'discrete', options: [ [ 'circle', 'open dot' ] ] }
     ]
   },
   'text-indent': {
     // https://drafts.csswg.org/css-text-3/#propdef-text-indent
     types: [
-    ]
-  },
-  'text-orientation': {
-    // https://drafts.csswg.org/css-writing-modes-3/#propdef-text-orientation
-    types: [
-      { type: 'discrete', options: [ [ 'upright', 'sideways' ] ] }
     ]
   },
   'text-overflow': {
@@ -1368,7 +1314,7 @@ var gCSSProperties = {
     // https://drafts.csswg.org/css-text-decor-3/#propdef-text-shadow
     types: [ 'textShadowList' ],
     setup: t => {
-      var element = createElement(t);
+      const element = createElement(t);
       element.style.color = 'green';
       return element;
     }
@@ -1411,11 +1357,24 @@ var gCSSProperties = {
       { type: 'discrete', options: [ [ 'flat', 'preserve-3d' ] ] }
     ]
   },
-  'unicode-bidi': {
-    // https://drafts.csswg.org/css-writing-modes-3/#propdef-unicode-bidi
-    types: [
-      { type: 'discrete', options: [ [ 'embed', 'bidi-override' ] ] },
-    ]
+  'rotate': {
+    // https://drafts.csswg.org/css-transforms-2/#individual-transforms
+    types: [ 'rotateList' ]
+  },
+  'translate': {
+    // https://drafts.csswg.org/css-transforms-2/#individual-transforms
+    types: [ 'translateList' ],
+    setup: t => {
+      // We need to set a width/height for resolving percentages against.
+      const element = createElement(t);
+      element.style.width = '100px';
+      element.style.height = '100px';
+      return element;
+    }
+  },
+  'scale': {
+    // https://drafts.csswg.org/css-transforms-2/#individual-transforms
+    types: [ 'scaleList' ]
   },
   'vector-effect': {
     // https://svgwg.org/svg2-draft/coords.html#VectorEffectProperty
@@ -1453,18 +1412,6 @@ var gCSSProperties = {
     // https://drafts.csswg.org/css-text-3/#propdef-word-spacing
     types: [ 'lengthPercentageOrCalc' ]
   },
-  'will-change': {
-    // http://dev.w3.org/csswg/css-will-change/#propdef-will-change
-    types: [
-      { type: 'discrete', options: [ [ 'scroll-position', 'contents' ] ] }
-    ]
-  },
-  'writing-mode': {
-    // https://drafts.csswg.org/css-writing-modes-3/#propdef-writing-mode
-    types: [
-      { type: 'discrete', options: [ [ 'vertical-rl', 'sideways-rl' ] ] }
-    ]
-  },
   'z-index': {
     // https://drafts.csswg.org/css-position/#propdef-z-index
     types: [
@@ -1473,17 +1420,15 @@ var gCSSProperties = {
 };
 
 function testAnimationSamples(animation, idlName, testSamples) {
-  const type = animation.effect.target.type;
-  const target = animation.effect.target.constructor.name === 'CSSPseudoElement'
-                 ? animation.effect.target.parentElement
-                 : animation.effect.target;
-  testSamples.forEach(testSample => {
+  const pseudoType = animation.effect.pseudoElement;
+  const target = animation.effect.target;
+  for (const testSample of testSamples) {
     animation.currentTime = testSample.time;
-    assert_equals(getComputedStyle(target, type)[idlName],
+    assert_equals(getComputedStyle(target, pseudoType)[idlName],
                   testSample.expected,
                   `The value should be ${testSample.expected}` +
                   ` at ${testSample.time}ms`);
-  });
+  }
 }
 
 function toOrderedArray(string) {
@@ -1494,11 +1439,9 @@ function toOrderedArray(string) {
 // don't specify an order for serializing computed values.
 // This test is for such the property.
 function testAnimationSamplesWithAnyOrder(animation, idlName, testSamples) {
-  const type = animation.effect.target.type;
-  const target = animation.effect.target.constructor.name === 'CSSPseudoElement'
-                 ? animation.effect.target.parentElement
-                 : animation.effect.target;
-  testSamples.forEach(testSample => {
+  const type = animation.effect.pseudoElement;
+  const target = animation.effect.target;
+  for (const testSample of testSamples) {
     animation.currentTime = testSample.time;
 
     // Convert to array and sort the expected and actual value lists first
@@ -1510,19 +1453,53 @@ function testAnimationSamplesWithAnyOrder(animation, idlName, testSamples) {
     assert_array_equals(computedValues, expectedValues,
                         `The computed values should be ${expectedValues}` +
                         ` at ${testSample.time}ms`);
-  });
+  }
+}
+
+function RoundMatrix(style) {
+  var matrixMatch = style.match(/^(matrix(3d)?)\(.+\)$/);
+  if (!!matrixMatch) {
+    var matrixType = matrixMatch[1];
+    var matrixArgs = style.substr(matrixType.length);
+    var extractmatrix = function(matrixStr) {
+      var list = [];
+      var regex = /[+\-]?[0-9]+[.]?[0-9]*(e[+/-][0-9]+)?/g;
+      var match = undefined;
+      do {
+        match = regex.exec(matrixStr);
+        if (match) {
+          list.push(parseFloat(parseFloat(match[0]).toFixed(6)));
+        }
+      } while (match);
+      return list;
+    }
+    return matrixType + '(' + extractmatrix(matrixArgs).join(', ') + ')';
+  }
+  return style;
 }
 
 function testAnimationSampleMatrices(animation, idlName, testSamples) {
-  var target = animation.effect.target;
-  testSamples.forEach(function(testSample) {
+  const target = animation.effect.target;
+  for (const testSample of testSamples) {
     animation.currentTime = testSample.time;
-    var actual = getComputedStyle(target)[idlName];
-    var expected = createMatrixFromArray(testSample.expected);
+    const actual = RoundMatrix(getComputedStyle(target)[idlName]);
+    const expected = RoundMatrix(createMatrixFromArray(testSample.expected));
     assert_matrix_equals(actual, expected,
-                         'The value should be ' + expected +
-                         ' at ' + testSample.time + 'ms but got ' + actual);
-  });
+                         `The value should be ${expected} at`
+                         + ` ${testSample.time}ms but got ${actual}`);
+  }
+}
+
+function testAnimationSampleRotate3d(animation, idlName, testSamples) {
+  const target = animation.effect.target;
+  for (const testSample of testSamples) {
+    animation.currentTime = testSample.time;
+    const actual = getComputedStyle(target)[idlName];
+    const expected = testSample.expected;
+    assert_rotate3d_equals(actual, expected,
+                         `The value should be ${expected} at`
+                         + ` ${testSample.time}ms but got ${actual}`);
+  }
 }
 
 function createTestElement(t, setup) {
@@ -1530,7 +1507,8 @@ function createTestElement(t, setup) {
 }
 
 function isSupported(property) {
-  var testKeyframe = new TestKeyframe(propertyToIDL(property));
+  const testKeyframe = new TestKeyframe(propertyToIDL(property));
+  assert_not_equals(window.KeyframeEffect, undefined, 'window.KeyframeEffect');
   try {
     // Since TestKeyframe returns 'undefined' for |property|,
     // the KeyframeEffect constructor will throw
@@ -1541,7 +1519,7 @@ function isSupported(property) {
 }
 
 function TestKeyframe(testProp) {
-  var _propAccessCount = 0;
+  let _propAccessCount = 0;
 
   Object.defineProperty(this, testProp, {
     get: function() { _propAccessCount++; },
@@ -1554,7 +1532,7 @@ function TestKeyframe(testProp) {
 }
 
 function propertyToIDL(property) {
-  // https://w3c.github.io/web-animations/#animation-property-name-to-idl-attribute-name
+  // https://drafts.csswg.org/web-animations/#animation-property-name-to-idl-attribute-name
   if (property === 'float') {
     return 'cssFloat';
   }
@@ -1563,11 +1541,11 @@ function propertyToIDL(property) {
                             return str.substr(1).toUpperCase(); });
 }
 function calcFromPercentage(idlName, percentageValue) {
-  var examElem = document.createElement('div');
+  const examElem = document.createElement('div');
   document.body.appendChild(examElem);
   examElem.style[idlName] = percentageValue;
 
-  var calcValue = getComputedStyle(examElem)[idlName];
+  const calcValue = getComputedStyle(examElem)[idlName];
   document.body.removeChild(examElem);
 
   return calcValue;

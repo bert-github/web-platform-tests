@@ -67,7 +67,7 @@ function ng_test(url, mode, credentials) {
       return login_and_register
         .then(function(frame) {
             var fetchRequest = frame_fetch(frame, url, mode, credentials);
-            return promise_rejects(t, new TypeError(), fetchRequest);
+            return promise_rejects_js(t, frame.contentWindow.TypeError, fetchRequest);
           });
     }, 'url:\"' + url + '\" mode:\"' + mode +
        '\" credentials:\"' + credentials + '\" should fail.');
@@ -193,6 +193,9 @@ for_each_origin_mode_credentials(function(origin, mode, credentials) {
   // Fetch to the other origin with same-origin mode should fail.
   if (origin == OTHER_ORIGIN && mode == 'same-origin') {
     ng_test(url, mode, credentials);
+  } else if (origin == BASE_ORIGIN && mode == 'same-origin') {
+    // Cors type response to a same-origin mode request should fail
+    ng_test(url, mode, credentials);
   } else {
     // The response from the SW should be cors.
     ok_test(url, mode, credentials, 'cors', 'undefined');
@@ -207,6 +210,9 @@ for_each_origin_mode_credentials(function(origin, mode, credentials) {
       'cors', 'include');
   // Fetch to the other origin with same-origin mode should fail.
   if (origin == OTHER_ORIGIN && mode == 'same-origin') {
+    ng_test(url, mode, credentials);
+  } else if (origin == BASE_ORIGIN && mode == 'same-origin') {
+    // Cors type response to a same-origin mode request should fail
     ng_test(url, mode, credentials);
   } else {
     // The response from the SW should be cors.

@@ -1,9 +1,10 @@
 import os
 import re
 import subprocess
+import tempfile
 
 from .. import vcs
-from ..vcs import bind_to_repo, git, hg
+from ..vcs import git, hg
 
 
 def get_unique_name(existing, initial):
@@ -15,7 +16,7 @@ def get_unique_name(existing, initial):
     :param initial: Name, or name prefix, to use"""
     if initial not in existing:
         return initial
-    for i in xrange(len(existing) + 1):
+    for i in range(len(existing) + 1):
         test = "%s_%s" % (initial, i + 1)
         if test not in existing:
             return test
@@ -38,6 +39,9 @@ class NoVCSTree(object):
         return True
 
     def add_new(self, prefix=None):
+        pass
+
+    def add_ignored(self, sync_tree, prefix):
         pass
 
     def create_patch(self, patch_name, message):
@@ -75,13 +79,13 @@ class HgTree(object):
             kwargs["repo"] = path
         try:
             hg("root", **kwargs)
-        except:
+        except Exception:
             return False
         return True
 
     @property
     def is_clean(self):
-        return self.hg("status").strip() == ""
+        return self.hg("status").strip() == b""
 
     def add_new(self, prefix=None):
         if prefix is not None:
@@ -90,13 +94,16 @@ class HgTree(object):
             args = ()
         self.hg("add", *args)
 
+    def add_ignored(self, sync_tree, prefix):
+        pass
+
     def create_patch(self, patch_name, message):
         try:
             self.hg("qinit", log_error=False)
         except subprocess.CalledProcessError:
             pass
 
-        patch_names = [item.strip() for item in self.hg("qseries").split("\n") if item.strip()]
+        patch_names = [item.strip() for item in self.hg("qseries").split(b"\n") if item.strip()]
 
         suffix = 0
         test_name = patch_name
@@ -131,11 +138,11 @@ class HgTree(object):
 class GitTree(object):
     name = "git"
 
-    def __init__(self, root=None):
+    def __init__(self, root=None, log_error=True):
         if root is None:
-            root = git("rev-parse", "--show-toplevel").strip()
+            root = git("rev-parse", "--show-toplevel", log_error=log_error).strip().decode('utf-8')
         self.root = root
-        self.git = vcs.bind_to_repo(git, self.root)
+        self.git = vcs.bind_to_repo(git, self.root, log_error=log_error)
         self.message = None
         self.commit_cls = Commit
 
@@ -155,7 +162,7 @@ class GitTree(object):
             kwargs["repo"] = path
         try:
             git("rev-parse", "--show-toplevel", **kwargs)
-        except:
+        except Exception:
             return False
         return True
 
@@ -169,7 +176,7 @@ class GitTree(object):
 
     @property
     def is_clean(self):
-        return self.git("status").strip() == ""
+        return self.git("status").strip() == b""
 
     def add_new(self, prefix=None):
         """Add files to the staging area.
@@ -178,10 +185,26 @@ class GitTree(object):
                        add all files under that path.
         """
         if prefix is None:
-            args = ("-a",)
+            args = ["-a"]
         else:
-            args = ("--no-ignore-removal", prefix)
+            args = ["--no-ignore-removal", prefix]
         self.git("add", *args)
+
+    def add_ignored(self, sync_tree, prefix):
+        """Add files to the staging area that are explicitly ignored by git.
+
+        :param prefix: None to include all files or a path prefix to
+                       add all files under that path.
+        """
+        with tempfile.TemporaryFile() as f:
+            sync_tree.git("ls-tree", "-z", "-r", "--name-only", "HEAD", stdout=f)
+            f.seek(0)
+            ignored_files = sync_tree.git("check-ignore", "--no-index", "--stdin", "-z", stdin=f)
+        args = []
+        for entry in ignored_files.decode('utf-8').split('\0'):
+            args.append(os.path.join(prefix, entry))
+        if args:
+            self.git("add", "--force", *args)
 
     def list_refs(self, ref_filter=None):
         """Get a list of sha1, name tuples for references in a repository.
@@ -194,7 +217,7 @@ class GitTree(object):
             args.append(ref_filter)
         data = self.git("show-ref", *args)
         rv = []
-        for line in data.split("\n"):
+        for line in data.split(b"\n"):
             if not line.strip():
                 continue
             sha1, ref = line.split()
@@ -212,7 +235,7 @@ class GitTree(object):
             args.append(ref_filter)
         data = self.git("ls-remote", remote, *args)
         rv = []
-        for line in data.split("\n"):
+        for line in data.split(b"\n"):
             if not line.strip():
                 continue
             sha1, ref = line.split()
@@ -225,8 +248,8 @@ class GitTree(object):
         :param remote: the remote URL
         :param branch: the branch name"""
         for sha1, ref in self.list_remote(remote, branch):
-            if ref == "refs/heads/%s" % branch:
-                return self.commit_cls(self, sha1)
+            if ref.decode('utf-8') == "refs/heads/%s" % branch:
+                return self.commit_cls(self, sha1.decode('utf-8'))
         assert False
 
     def create_patch(self, patch_name, message):
@@ -274,8 +297,8 @@ class GitTree(object):
 
         args = []
         if branch:
-            branches = [ref[len("refs/heads/"):] for sha1, ref in self.list_refs()
-                        if ref.startswith("refs/heads/")]
+            branches = [ref[len("refs/heads/"):].decode('utf-8') for sha1, ref in self.list_refs()
+                        if ref.startswith(b"refs/heads/")]
             branch = get_unique_name(branches, branch)
 
             args += ["-b", branch]
@@ -305,14 +328,14 @@ class GitTree(object):
 
     def paths(self):
         """List paths in the tree"""
-        repo_paths = [self.root] +  [os.path.join(self.root, path)
-                                     for path in self.submodules()]
+        repo_paths = [self.root] + [os.path.join(self.root, path)
+                                    for path in self.submodules()]
 
         rv = []
 
         for repo_path in repo_paths:
-            paths = vcs.git("ls-tree", "-r", "--name-only", "HEAD", repo=repo_path).split("\n")
-            rv.extend(os.path.relpath(os.path.join(repo_path, item), self.root) for item in paths
+            paths = vcs.git("ls-tree", "-r", "--name-only", "HEAD", repo=repo_path).split(b"\n")
+            rv.extend(os.path.relpath(os.path.join(repo_path, item.decode('utf-8')), self.root) for item in paths
                       if item.strip())
         return rv
 
@@ -320,11 +343,11 @@ class GitTree(object):
         """List submodule directories"""
         output = self.git("submodule", "status", "--recursive")
         rv = []
-        for line in output.split("\n"):
+        for line in output.split(b"\n"):
             line = line.strip()
             if not line:
                 continue
-            parts = line.split(" ")
+            parts = line.split(b" ")
             rv.append(parts[1])
         return rv
 
@@ -378,5 +401,5 @@ class Commit(object):
         self.git = self.tree.git
 
     def _get_meta(self):
-        author, email, message = self.git("show", "-s", "--format=format:%an\n%ae\n%B", self.sha1).split("\n", 2)
+        author, email, message = self.git("show", "-s", "--format=format:%an\n%ae\n%B", self.sha1).decode('utf-8').split("\n", 2)
         return author, email, self.msg_cls(message)

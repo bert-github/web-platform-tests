@@ -28,15 +28,6 @@
                 height: 100000px;
             }
         </style>
-
-        <script id="metadata_cache">/*
-        {
-          "transition padding-left on :before / values": {},
-          "transition padding-left on :after / values": {},
-          "transition padding-left on :before, changing content / values": {},
-          "transition padding-left on :after, changing content / values": {}
-        }
-        */</script>
     </head>
     <body>
         <!-- required by testharnessreport.js -->
@@ -93,7 +84,7 @@
             ];
 
             // general transition-duration
-            var duration = '0.5s';
+            var duration = '2s';
 
             runParallelAsyncHarness({
                 // array of test data
@@ -102,8 +93,6 @@
                 testsPerSlice: 50,
                 // milliseconds to wait before calling teardown and ending test
                 duration: parseFloat(duration) * 1000,
-                // the global suite timeout
-                timeout: timeout,
                 // prepare individual test
                 setup: function(data, options) {
                     generalParallelTest.setup(data, options);

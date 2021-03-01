@@ -23,7 +23,7 @@ The **Variable Test Axis Matching** font contains reference glyphs 0-9 to match 
 
 ### Building reference tests
 
-Using the **Variable Test Axis Matching** font, [reference tests](http://web-platform-tests.org/writing-tests/reftests.html) in this directory are created as follows:
+Using the **Variable Test Axis Matching** font, [reference tests](https://web-platform-tests.org/writing-tests/reftests.html) in this directory are created as follows:
 
  1. Define `@font-face`s with range expressions, which trigger variation axes to be applied to the variable font.
  2. Use CSS style definitions to request font faces from the set of declared `@font-face`s and use blocks of the glyph sequence MNOP.
@@ -35,12 +35,12 @@ Using the **Variable Test Axis Matching** font, [reference tests](http://web-pla
 
 ## Font Glyphs Reference
 
-The following table explains the relationship between the M, N, O, P variation axis controlled glyphs and the non-scaled glyphs used as references.
+The following table explains the relationship between the M, N, O, P variation axis controlled glyphs and the non-scaled glyphs used as references. The values are specified as OpenType axis parameter values. CSS values are mapped to to those values, for example from CSS font-weight values straight to `wght`, for width from percentages straight to `wdth`. For `slnt` the CSS values are positive clockwise, but the OpenType values are positive turning counterclockwise. Here the mapping is inverted, i.e. the CSS value is multiple by -1. Compare the note in [the CSS font style property](https://drafts.csswg.org/css-fonts/#font-style-prop).
 
 | Bar Length in FUnits | 200 | 400 | 600 | 800 | 1000 | 1200 | 1400 | 1600 | 1800
 | :---: | :---: |:---: |:---: |:---: |:---: |:---: |:---: |:---: |:---: |
-| Glyph **N**, Style, `slnt` | -90.00% | -67.50% | -45.00% | -20.00% | 0.00% | 20.00% | 45.00% | 67.50% | 90.00%
-| Glyph **M**, Stretch Axis `wdth` | 50% | 62.50% | 75% | 87.50% | 100% | 112.50% | 125% | 150% | 200%
+| Glyph **N**, Style, `slnt` | 90 | 67.5 | 45 | 20 | 0.00 | -20 | -45 | -67.5 | -90
+| Glyph **M**, Stretch Axis `wdth` | 50 | 62.5 | 75 | 87.5 | 100 | 112.5 | 125 | 150 | 200
 | Glyph **O**, Style, `ital` | 0 | 0.125 | 0.25 | 0.375 | 0.5 | 0.625 | 0.75 | 0.875 | 1
 | Glyph **P**, Weight, `wght` | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900
 | **Ref Glyphs for:** |  |  |  |  |  |  |  |  |

@@ -1,17 +1,3 @@
-var inputModeKeywords = [
-  "verbatim",
-  "latin",
-  "latin-name",
-  "latin-prose",
-  "full-width-latin",
-  "kana",
-  "kana-name",
-  "katakana",
-  "numeric",
-  "tel",
-  "email",
-  "url",
-];
 var formElements = {
   form: {
     acceptCharset: {type: "string", domAttrName: "accept-charset"},
@@ -41,7 +27,6 @@ var formElements = {
     accept: "string",
     alt: "string",
     autocomplete: {type: "string", customGetter: true},
-    autofocus: "boolean",
     defaultChecked: {type: "boolean", domAttrName: "checked"},
     dirName: "string",
     disabled: "boolean",
@@ -52,7 +37,6 @@ var formElements = {
     formNoValidate: "boolean",
     formTarget: "string",
     height: {type: "unsigned long", customGetter: true},
-    inputMode: {type: "enum", keywords: inputModeKeywords},
     max: "string",
     maxLength: "limited long",
     min: "string",
@@ -80,7 +64,6 @@ var formElements = {
     useMap: "string",
   },
   button: {
-    autofocus: "boolean",
     disabled: "boolean",
     // "formAction" has magic hard-coded in reflection.js
     formAction: "url",
@@ -94,7 +77,6 @@ var formElements = {
   },
   select: {
     autocomplete: {type: "string", customGetter: true},
-    autofocus: "boolean",
     disabled: "boolean",
     multiple: "boolean",
     name: "string",
@@ -114,11 +96,9 @@ var formElements = {
   },
   textarea: {
     autocomplete: {type: "string", customGetter: true},
-    autofocus: "boolean",
     cols: {type: "limited unsigned long with fallback", defaultVal: 20},
     dirName: "string",
     disabled: "boolean",
-    inputMode: {type: "enum", keywords: inputModeKeywords},
     maxLength: "limited long",
     minLength: "limited long",
     name: "string",
