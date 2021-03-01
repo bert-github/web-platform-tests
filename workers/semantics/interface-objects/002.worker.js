@@ -10,12 +10,9 @@ var unexpected = [
   "Audio",
   "HTMLCanvasElement",
   "Path",
-  "TextMetrics",
   "CanvasProxy",
   "CanvasRenderingContext2D",
   "DrawingStyle",
-  "CanvasGradient",
-  "CanvasPattern",
   "BeforeUnloadEvent",
   "PopStateEvent",
   "HashChangeEvent",
@@ -23,11 +20,6 @@ var unexpected = [
   // https://dom.spec.whatwg.org/
   "DOMImplementation",
   // https://streams.spec.whatwg.org/
-  "ReadableStreamDefaultReader",
-  "ReadableStreamBYOBReader",
-  "ReadableStreamDefaultController",
-  "ReadableByteStreamController",
-  "WritableStreamDefaultWriter",
   "WritableStreamDefaultController",
   // http://w3c.github.io/IndexedDB/
   "IDBEnvironment",

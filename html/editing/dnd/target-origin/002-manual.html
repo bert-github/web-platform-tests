@@ -9,6 +9,7 @@ blockquote + blockquote + blockquote { background: fuchsia; }
 blockquote + div { clear: left; }
     </style>
     <script type="text/javascript" src="/resources/testharness.js"></script>
+    <script type="text/javascript" src="/resources/testharnessreport.js"></script>
     <script type="text/javascript">
 setup(function () {},{explicit_done:true});
 window.onload = function () {
@@ -38,7 +39,7 @@ window.onload = function () {
       assert_true( !!e.dataTransfer.allowTargetOrigin );
     }, 'allowTargetOrigin should exist in '+e.type );
     test(function() {
-      assert_throws( 'SECURITY_ERR', function () { e.dataTransfer.allowTargetOrigin('*'); } );
+      assert_throws_dom( 'SECURITY_ERR', function () { e.dataTransfer.allowTargetOrigin('*'); } );
     }, 'allowTargetOrigin should throw a SECURITY_ERR in '+e.type );
   };
   fuchsia.ondragenter = fuchsia.ondragover = fuchsia.ondrop = function (e) {
@@ -49,7 +50,7 @@ window.onload = function () {
       assert_true( !!e.dataTransfer.allowTargetOrigin );
     }, 'allowTargetOrigin should exist in '+e.type );
     test(function() {
-      assert_throws( 'SECURITY_ERR', function () { e.dataTransfer.allowTargetOrigin('*'); } );
+      assert_throws_dom( 'SECURITY_ERR', function () { e.dataTransfer.allowTargetOrigin('*'); } );
     }, 'allowTargetOrigin should throw a SECURITY_ERR in '+e.type );
   };
   orange.ondragend = function (e) {
@@ -59,7 +60,7 @@ window.onload = function () {
       assert_true( !!e.dataTransfer.allowTargetOrigin );
     }, 'allowTargetOrigin should exist in '+e.type );
     test(function() {
-      assert_throws( 'SECURITY_ERR', function () { e.dataTransfer.allowTargetOrigin('*'); } );
+      assert_throws_dom( 'SECURITY_ERR', function () { e.dataTransfer.allowTargetOrigin('*'); } );
     }, 'allowTargetOrigin should throw a SECURITY_ERR in '+e.type );
     test(function() {
       var failtxt = '- Reload and try again';

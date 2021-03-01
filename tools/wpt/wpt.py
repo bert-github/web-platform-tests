@@ -4,9 +4,8 @@ import logging
 import os
 import sys
 
-from tools import localpaths
+from tools import localpaths  # noqa: F401
 
-from six import iteritems
 from . import virtualenv
 
 
@@ -23,7 +22,7 @@ def load_commands():
         base_dir = os.path.dirname(abs_path)
         with open(abs_path, "r") as f:
             data = json.load(f)
-            for command, props in iteritems(data):
+            for command, props in data.items():
                 assert "path" in props
                 assert "script" in props
                 rv[command] = {
@@ -37,16 +36,21 @@ def load_commands():
                     "requirements": [os.path.join(base_dir, item)
                                      for item in props.get("requirements", [])]
                 }
+                if rv[command]["install"] or rv[command]["requirements"]:
+                    assert rv[command]["virtualenv"]
     return rv
 
 
-def parse_args(argv, commands):
+def parse_args(argv, commands=load_commands()):
     parser = argparse.ArgumentParser()
     parser.add_argument("--venv", action="store", help="Path to an existing virtualenv to use")
+    parser.add_argument("--skip-venv-setup", action="store_true",
+                        dest="skip_venv_setup",
+                        help="Whether to use the virtualenv as-is. Must set --venv as well")
     parser.add_argument("--debug", action="store_true", help="Run the debugger in case of an exception")
     subparsers = parser.add_subparsers(dest="command")
-    for command, props in iteritems(commands):
-        sub_parser = subparsers.add_parser(command, help=props["help"], add_help=False)
+    for command, props in commands.items():
+        subparsers.add_parser(command, help=props["help"], add_help=False)
 
     args, extra = parser.parse_known_args(argv)
 
@@ -77,15 +81,51 @@ def import_command(prog, command, props):
     return script, parser
 
 
-def setup_virtualenv(path, props):
+def create_complete_parser():
+    """Eagerly load all subparsers. This involves more work than is required
+    for typical command-line usage. It is maintained for the purposes of
+    documentation generation as implemented in WPT's top-level `/docs`
+    directory."""
+
+    commands = load_commands()
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+
+    for command in commands:
+        props = commands[command]
+
+        if props["virtualenv"]:
+            setup_virtualenv(None, False, props)
+
+        subparser = import_command('wpt', command, props)[1]
+        if not subparser:
+            continue
+
+        subparsers.add_parser(command,
+                              help=props["help"],
+                              add_help=False,
+                              parents=[subparser])
+
+    return parser
+
+
+def venv_dir():
+    return "_venv" + str(sys.version_info[0])
+
+
+def setup_virtualenv(path, skip_venv_setup, props):
+    if skip_venv_setup and path is None:
+        raise ValueError("Must set --venv when --skip-venv-setup is used")
+    should_skip_setup = path is not None and skip_venv_setup
     if path is None:
-        path = os.path.join(wpt_root, "_venv")
-    venv = virtualenv.Virtualenv(path)
-    venv.start()
-    for name in props["install"]:
-        venv.install(name)
-    for path in props["requirements"]:
-        venv.install_requirements(path)
+        path = os.path.join(wpt_root, venv_dir())
+    venv = virtualenv.Virtualenv(path, should_skip_setup)
+    if not should_skip_setup:
+        venv.start()
+        for name in props["install"]:
+            venv.install(name)
+        for path in props["requirements"]:
+            venv.install_requirements(path)
     return venv
 
 
@@ -101,14 +141,11 @@ def main(prog=None, argv=None):
 
     main_args, command_args = parse_args(argv, commands)
 
-    if not(len(argv) and argv[0] in commands):
-        sys.exit(1)
-
     command = main_args.command
     props = commands[command]
     venv = None
     if props["virtualenv"]:
-        venv = setup_virtualenv(main_args.venv, props)
+        venv = setup_virtualenv(main_args.venv, main_args.skip_venv_setup, props)
     script, parser = import_command(prog, command, props)
     if parser:
         if props["parse_known"]:

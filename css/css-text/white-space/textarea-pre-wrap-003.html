@@ -5,6 +5,7 @@
 <link rel="help" href="https://drafts.csswg.org/css-text-3/#white-space-phase-2">
 <link rel="match" href="reference/textarea-pre-wrap-001-ref.html">
 <meta name="assert" content="preserved white space at the end of the line is not wrapped when the white-space property is set to pre-wrap, even if word-break is keep-all in a textarea.">
+<link rel="stylesheet" type="text/css" href="/fonts/ahem.css" />
 <style>
 textarea {
   word-wrap: initial; /*deprecated alias*/
@@ -19,7 +20,7 @@ textarea {
   overflow: hidden; /* I don't want scrollbars, and overflow:visible isn't typically supported on textarea */
 
   font-size: 20px;
-  font-family: ahem;
+  font-family: Ahem;
   line-height: 1em;
   white-space: pre-wrap;
   color: green;

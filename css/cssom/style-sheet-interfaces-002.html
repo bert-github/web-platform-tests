@@ -13,39 +13,28 @@
   <style id="styleElement" type="text/css" media="all" title="internal style sheet" disabled="disabled">
     * { margin: 0; padding: 0; }
   </style>
-  <script id="metadata_cache">/*
-{
-  "add_rule": {
-    "assert": ["Initial rule list is of size 1",
-               "Can add a rule at first index"]
-  },
-  "delete_rule": { "assert": "Can delete rules until rule list is empty" }
-}
-*/</script>
  </head>
  <body>
   <noscript>Test not run - javascript required.</noscript>
   <div id="log"></div>
   <script type="text/javascript">
   var sheet = document.getElementById("styleElement").sheet;
+  // Initial rule list is of size 1
+  // Can add a rule at first index
   test(function() {
     assert_equals(sheet.cssRules.length, 1);
     sheet.insertRule("p { color: green; }", 0);
     assert_equals(sheet.cssRules.length, 2);
     assert_equals(sheet.cssRules.item(0).cssText, "p { color: green; }");
-  }, "add_rule", {
-    assert: [   "Initial rule list is of size 1",
-                "Can add a rule at first index" ]
-  });
+  }, "add_rule");
 
+  // Can delete rules until rule list is empty
   test(function() {
     sheet.deleteRule(0);
     assert_equals(sheet.cssRules.length, 1);
     sheet.deleteRule(0);
     assert_equals(sheet.cssRules.length, 0);
-  }, "delete_rule", {
-    assert: "Can delete rules until rule list is empty"
-  });
+  }, "delete_rule");
   </script>
  </body>
 </html>

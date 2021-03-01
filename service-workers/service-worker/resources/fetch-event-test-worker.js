@@ -29,10 +29,20 @@ function handleReferrerFull(event) {
 
 function handleClientId(event) {
   var body;
-  if (event.clientId !== null) {
+  if (event.clientId !== "") {
     body = 'Client ID Found: ' + event.clientId;
   } else {
     body = 'Client ID Not Found';
+  }
+  event.respondWith(new Response(body));
+}
+
+function handleResultingClientId(event) {
+  var body;
+  if (event.resultingClientId !== "") {
+    body = 'Resulting Client ID Found: ' + event.resultingClientId;
+  } else {
+    body = 'Resulting Client ID Not Found';
   }
   event.respondWith(new Response(body));
 }
@@ -129,6 +139,34 @@ function handleKeepalive(event) {
   event.respondWith(new Response(event.request.keepalive));
 }
 
+function handleIsReloadNavigation(event) {
+  const request = event.request;
+  const body =
+    `method = ${request.method}, ` +
+    `isReloadNavigation = ${request.isReloadNavigation}`;
+  event.respondWith(new Response(body));
+}
+
+function handleIsHistoryNavigation(event) {
+  const request = event.request;
+  const body =
+    `method = ${request.method}, ` +
+    `isHistoryNavigation = ${request.isHistoryNavigation}`;
+  event.respondWith(new Response(body));
+}
+
+function handleUseAndIgnore(event) {
+  const request = event.request;
+  request.text();
+  return;
+}
+
+function handleCloneAndIgnore(event) {
+  const request = event.request;
+  request.clone().text();
+  return;
+}
+
 self.addEventListener('fetch', function(event) {
     var url = event.request.url;
     var handlers = [
@@ -139,6 +177,7 @@ self.addEventListener('fetch', function(event) {
       { pattern: '?referrerPolicy', fn: handleReferrerPolicy },
       { pattern: '?referrer', fn: handleReferrer },
       { pattern: '?clientId', fn: handleClientId },
+      { pattern: '?resultingClientId', fn: handleResultingClientId },
       { pattern: '?ignore', fn: function() {} },
       { pattern: '?null', fn: handleNullBody },
       { pattern: '?fetch', fn: handleFetch },
@@ -151,6 +190,10 @@ self.addEventListener('fetch', function(event) {
       { pattern: '?integrity', fn: handleIntegrity },
       { pattern: '?request-body', fn: handleRequestBody },
       { pattern: '?keepalive', fn: handleKeepalive },
+      { pattern: '?isReloadNavigation', fn: handleIsReloadNavigation },
+      { pattern: '?isHistoryNavigation', fn: handleIsHistoryNavigation },
+      { pattern: '?use-and-ignore', fn: handleUseAndIgnore },
+      { pattern: '?clone-and-ignore', fn: handleCloneAndIgnore },
     ];
 
     var handler = null;

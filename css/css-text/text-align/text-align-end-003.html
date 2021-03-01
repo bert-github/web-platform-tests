@@ -7,10 +7,11 @@
 <link rel='help' href='https://drafts.csswg.org/css-text-3/#text-align-property'>
 <link rel='match' href='reference/text-align-end-ref-003.html'>
 <meta name="assert" content="text-align:end aligns inline-level content to the end edge of the line box – ie. left when direction is horizontal, rtl.">
+<link rel="stylesheet" type="text/css" href="/fonts/ahem.css" />
 <style type='text/css'>
 .test { text-align: end; }
 /* the CSS below is not part of the test */
-.test, .ref { border: 1px solid orange;  margin: 20px; width: 300px; color: orange; font: 24px/24px ahem; }
+.test, .ref { border: 1px solid orange;  margin: 20px; width: 300px; color: orange; font: 24px/24px Ahem; }
 .ref { position: relative;  height: 24px; }
 #rb1 { position: absolute; top: 0; left: 0; background-color: orange; width: 120px;  height: 24px; }
 </style>
