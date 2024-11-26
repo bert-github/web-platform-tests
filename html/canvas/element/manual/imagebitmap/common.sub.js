@@ -32,25 +32,29 @@ function makeOffscreenCanvas() {
     });
 }
 
-var imageBitmapVideoPromise = new Promise(function(resolve, reject) {
-    var video = document.createElement("video");
-    video.oncanplaythrough = function() {
-        resolve(video);
-    };
-    video.onerror = reject;
+function makeMakeVideo(src) {
+    return function () {
+        return new Promise(function(resolve, reject) {
+            var video = document.createElement("video");
+            video.oncanplaythrough = function() {
+                resolve(video);
+            };
+            video.onerror = reject;
 
-    // preload=auto is required to ensure a frame is available once
-    // canplaythrough is fired. The default of preload=metadata does not
-    // gaurantee this.
-    video.preload = "auto";
-    video.src = getVideoURI("/images/pattern");
+            // preload=auto is required to ensure a frame is available once
+            // canplaythrough is fired. The default of preload=metadata does not
+            // gaurantee this.
+            video.preload = "auto";
+            video.src = getVideoURI(src);
 
-    // Prevent WebKit from garbage collecting event handlers.
-    window._video = video;
-});
+            // Prevent WebKit from garbage collecting event handlers.
+            window._video = video;
+        });
+    }
+}
 
 function makeVideo() {
-    return imageBitmapVideoPromise;
+  return makeMakeVideo("/images/pattern")();
 }
 
 var imageBitmapDataUrlVideoPromise = fetch(getVideoURI("/images/pattern"))
@@ -139,16 +143,18 @@ function makeImageBitmap() {
     });
 }
 
-function makeBlob() {
-    return new Promise(function(resolve, reject) {
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", '/images/pattern.png');
-        xhr.responseType = 'blob';
-        xhr.send();
-        xhr.onload = function() {
-            resolve(xhr.response);
-        };
-    });
+function makeBlob(src) {
+    return function () {
+        return new Promise(function(resolve, reject) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", src);
+            xhr.responseType = 'blob';
+            xhr.send();
+            xhr.onload = function() {
+                resolve(xhr.response);
+            };
+        });
+    }
 }
 
 var imageSourceTypes = [
@@ -162,5 +168,5 @@ var imageSourceTypes = [
     { name: 'an OffscreenCanvas',   factory: makeOffscreenCanvas },
     { name: 'an ImageData',         factory: makeImageData },
     { name: 'an ImageBitmap',       factory: makeImageBitmap },
-    { name: 'a Blob',               factory: makeBlob },
+    { name: 'a Blob',               factory: makeBlob("/images/pattern.png") },
 ];

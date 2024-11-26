@@ -1,4 +1,4 @@
-// META: global=window,dedicatedworker,jsshell
+// META: global=window,dedicatedworker,jsshell,shadowrealm
 // META: script=/wasm/jsapi/assertions.js
 
 function test_operations(object, object_name, operations) {
@@ -143,7 +143,7 @@ test_attributes(WebAssembly.Memory.prototype, "WebAssembly.Memory", [
 test_operations(WebAssembly.Table.prototype, "WebAssembly.Table", [
   ["grow", 1],
   ["get", 1],
-  ["set", 2],
+  ["set", 1],
 ]);
 
 test_attributes(WebAssembly.Table.prototype, "WebAssembly.Table", [

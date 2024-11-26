@@ -2,24 +2,33 @@
 
 The tests are designed to be run from your local computer.
 
+# Install WPT
+
+If you haven't already, clone the web-platform-tests repository:
+
+```bash
+git clone https://github.com/web-platform-tests/wpt.git
+cd wpt
+```
+
 ## System Setup
 
-Running the tests requires `python`, `pip` and `virtualenv`, as well as updating
-the system `hosts` file.
+Running the tests requires `python` and `pip` as well as updating the
+system `hosts` file.
 
-WPT requires Python 3.6 or higher.
+WPT requires Python 3.8 or higher.
 
 The required setup is different depending on your operating system.
 
 ### Linux Setup
 
 If not already present, use the system package manager to install `python`,
-`pip` and `virtualenv`.
+and `pip`.
 
-On Debian or Ubuntu:
+On Ubuntu:
 
 ```bash
-sudo apt-get install python python-pip virtualenv
+sudo apt-get install python3 python3-pip python3-venv
 ```
 
 It is important to have a package that provides a `python` binary. On Fedora,
@@ -28,13 +37,12 @@ Ubuntu Focal and later, the package is called `python-is-python3`.
 
 ### macOS Setup
 
-The system-provided Python can be used, while `pip` and `virtualenv` can be
+The system-provided Python can be used, while `pip` can be
 installed for the user only:
 
 ```bash
 python -m ensurepip --user
-export PATH="$PATH:$HOME/Library/Python/2.7/bin"
-pip install --user virtualenv
+export PATH="$PATH:$( python3 -m site --user-base )/bin"
 ```
 
 To make the `PATH` change persistent, add it to your `~/.bash_profile` file or
@@ -49,12 +57,6 @@ installer includes `pip` by default.
 
 Add `C:\Python39` and `C:\Python39\Scripts` to your `%Path%`
 [environment variable](http://www.computerhope.com/issues/ch000549.htm).
-
-Finally, install `virtualenv`:
-
-```bash
-pip install virtualenv
-```
 
 The standard Windows shell requires that all `wpt` commands are prefixed
 by the Python binary i.e. assuming `python` is on your path the server is
@@ -152,7 +154,7 @@ customising the test run:
     ./wpt run --help
 
 [A complete listing of the command-line arguments is available
-here](command-line-arguments.md).
+here](command-line-arguments.html#run).
 
 ```eval_rst
 .. toctree::
@@ -161,7 +163,7 @@ here](command-line-arguments.md).
    command-line-arguments
 ```
 
-Additional browser-specific documentation:
+### Browser-specific instructions
 
 ```eval_rst
 .. toctree::
@@ -173,8 +175,45 @@ Additional browser-specific documentation:
   webkitgtk_minibrowser
 ```
 
+### Running in parallel
+
+To speed up the testing process, use the `--processes` option to run multiple
+browser instances in parallel. For example, to run the tests in dom/ with six
+Firefox instances in parallel:
+
+    ./wpt run --processes=6 firefox dom/
+
+But note that behaviour in this mode is necessarily less deterministic than with
+a single process (the default), so there may be more noise in the test results.
+
+### Output formats
+
+By default, `./wpt run` outputs test results and a summary in a human readable
+format. For debugging, `--log-mach` can give more verbose output. (In particular,
+it will show the console output from the browser and driver;
+by default, those are not shown) For example:
+
+    ./wpt run --log-mach=- --log-mach-level=info firefox dom/
+
+A machine readable JSON report can be produced using `--log-wptreport`. This
+together with `--log-wptscreenshot` is what is used to produce results for
+[wpt.fyi](https://wpt.fyi). For example:
+
+    ./wpt run --log-wptreport=report.json --log-wptscreenshot=screenshots.txt firefox css/css-grid/
+
+(See [wpt.fyi documentation](https://github.com/web-platform-tests/wpt.fyi/blob/main/api/README.md#results-creation)
+for how results are uploaded.)
+
+### Expectation data
+
 For use in continuous integration systems, and other scenarios where regression
 tracking is required, the command-line interface supports storing and loading
 the expected result of each test in a test run. See [Expectations
 Data](../../tools/wptrunner/docs/expectation) for more information on creating
 and maintaining these files.
+
+## Testing polyfills
+
+Polyfill scripts can be tested using the `--inject-script` argument to either
+`wpt run` or `wpt serve`. See [Testing Polyfills](testing-polyfills) for
+details.

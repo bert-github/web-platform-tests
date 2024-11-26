@@ -1,11 +1,11 @@
-import mock
 from io import BytesIO
+from unittest import mock
 
 from wptserve.response import Response
 
 
 def test_response_status():
-    cases = [200, (200, b'OK'), (200, u'OK'), ('200', 'OK')]
+    cases = [200, (200, b'OK'), (200, 'OK'), ('200', 'OK')]
 
     for case in cases:
         handler = mock.Mock()

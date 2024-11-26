@@ -7,6 +7,8 @@
     <meta name="timeout" content="long">
     <script src="/resources/testharness.js"></script>
     <script src="/resources/testharnessreport.js"></script>
+    <script src="/resources/testdriver.js"></script>
+    <script src="/resources/testdriver-vendor.js"></script>
     <script src="/cookies/resources/cookie-test.js"></script>
   </head>
   <body>
@@ -17,7 +19,7 @@
           cookie: "test1=;  path = /",
           expected: "test1=",
           name: "Set valueless cookie to its name with empty value",
-          defaultValue: false,
+          defaultPath: false,
         },
         {
           cookie: "=test=2",
@@ -130,6 +132,11 @@
           name: "Overwrite nameless cookie",
         },
         {
+          cookie: ["=__Secure-abc=123", "=__Host-abc=123", "=__SeCuRe-abc=123", "=__HoSt-abc=123", "__Secure-abc", "__Host-abc", "__SeCuRe-abc", "__HoSt-abc"],
+          expected: "",
+          name: "Ignore nameless cookies that impersonate cookie prefixes",
+        },
+        {
           cookie: "=",
           expected: "",
           name: "Ignore cookie with empty name and empty value",
@@ -138,6 +145,11 @@
           cookie: "",
           expected: "",
           name: "Ignore cookie with no name or value",
+        },
+        {
+          cookie: "%74%65%73%74=20",
+          expected: "%74%65%73%74=20",
+          name: "URL-encoded cookie name is not decoded",
         },
       ];
 

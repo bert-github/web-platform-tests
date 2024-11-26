@@ -383,6 +383,101 @@ promise_test(async (t) => {
   checkGetTargetRangesOfInputOnDeleteSomething();
 }, 'Backspace at "<p>abc   </p><pre>[]   def</pre>"');
 
+promise_test(async (t) => {
+  initializeTest('<p style="white-space:pre-line">abc\ndef</p>');
+  const p = gEditor.firstChild;
+  const text = p.firstChild;
+  gSelection.collapse(text, "abc\n".length);
+  await sendBackspaceKey();
+  checkEditorContentResultAsSubTest(
+    '<p style="white-space:pre-line">abcdef</p>',
+    t.name
+  );
+  checkGetTargetRangesOfBeforeinputOnDeleteSomething({
+    startContainer: text,
+    startOffset: "abc".length,
+    endContainer: text,
+    endOffset: "abc\n".length,
+  });
+  checkGetTargetRangesOfInputOnDeleteSomething();
+}, 'Backspace at "<p style="white-space:pre-line">abc\\n[]def</p>"');
+
+promise_test(async (t) => {
+  initializeTest('<p style="white-space:pre-line">abc \ndef</p>');
+  const p = gEditor.firstChild;
+  const text = p.firstChild;
+  gSelection.collapse(text, "abc \n".length);
+  await sendBackspaceKey();
+  checkEditorContentResultAsSubTest(
+    '<p style="white-space:pre-line">abcdef</p>',
+    t.name
+  );
+  checkGetTargetRangesOfBeforeinputOnDeleteSomething({
+    startContainer: text,
+    startOffset: "abc".length,
+    endContainer: text,
+    endOffset: "abc \n".length,
+  });
+  checkGetTargetRangesOfInputOnDeleteSomething();
+}, 'Backspace at "<p style="white-space:pre-line">abc \\n[]def</p>"');
+
+promise_test(async (t) => {
+  initializeTest('<p style="white-space:pre-line">abc\n def</p>');
+  const p = gEditor.firstChild;
+  const text = p.firstChild;
+  gSelection.collapse(text, "abc\n ".length);
+  await sendBackspaceKey();
+  checkEditorContentResultAsSubTest(
+    '<p style="white-space:pre-line">abcdef</p>',
+    t.name
+  );
+  checkGetTargetRangesOfBeforeinputOnDeleteSomething({
+    startContainer: text,
+    startOffset: "abc".length,
+    endContainer: text,
+    endOffset: "abc\n ".length,
+  });
+  checkGetTargetRangesOfInputOnDeleteSomething();
+}, 'Backspace at "<p style="white-space:pre-line">abc\\n []def</p>"');
+
+promise_test(async (t) => {
+  initializeTest('<p style="white-space:pre-line">abc \n def</p>');
+  const p = gEditor.firstChild;
+  const text = p.firstChild;
+  gSelection.collapse(text, "abc \n ".length);
+  await sendBackspaceKey();
+  checkEditorContentResultAsSubTest(
+    '<p style="white-space:pre-line">abcdef</p>',
+    t.name
+  );
+  checkGetTargetRangesOfBeforeinputOnDeleteSomething({
+    startContainer: text,
+    startOffset: "abc".length,
+    endContainer: text,
+    endOffset: "abc \n ".length,
+  });
+  checkGetTargetRangesOfInputOnDeleteSomething();
+}, 'Backspace at "<p style="white-space:pre-line">abc \\n []def</p>"');
+
+promise_test(async (t) => {
+  initializeTest('<p style="white-space:pre-line">abc \n \n def</p>');
+  const p = gEditor.firstChild;
+  const text = p.firstChild;
+  gSelection.collapse(text, "abc \n \n ".length);
+  await sendBackspaceKey();
+  checkEditorContentResultAsSubTest(
+    '<p style="white-space:pre-line">abc \ndef</p>',
+    t.name
+  );
+  checkGetTargetRangesOfBeforeinputOnDeleteSomething({
+    startContainer: text,
+    startOffset: "abc \n".length,
+    endContainer: text,
+    endOffset: "abc \n \n ".length,
+  });
+  checkGetTargetRangesOfInputOnDeleteSomething();
+}, 'Backspace at "<p style="white-space:pre-line">abc \\n \\n []def</p>"');
+
 // If the first block has invisible `<br>` element and joining it with
 // the following block, the invisible trailing `<br>` element should be
 // deleted and join the blocks.  Therefore, the target range should contain
@@ -1966,5 +2061,71 @@ promise_test(async (t) => {
   });
   checkGetTargetRangesOfInputOnDeleteSomething();
 }, 'Meta + Backspace at "<p>   abc[] def</p>"');
+
+// If editing host is nested, editing in the nested one shouldn't cause
+// target ranges extended to outside of it.
+promise_test(async t => {
+  const innerHTML = "<div contenteditable=\"false\"><div contenteditable=\"\"><p><br></p></div></div>";
+  initializeTest(innerHTML);
+  const p = gEditor.querySelector("p");
+  const innerEditingHost = p.parentNode;
+  document.activeElement?.blur();
+  p.parentNode.focus();
+  gSelection.collapse(p, 0);
+  await sendBackspaceKey();
+  if (gEditor.innerHTML == innerHTML) {
+    checkGetTargetRangesOfBeforeinputOnDeleteSomething({
+      startContainer: p,
+      startOffset: 0,
+      endContainer: p,
+      endOffset: 0,
+    });
+    checkGetTargetRangesOfInputOnDoNothing();
+  } else {
+    checkEditorContentResultAsSubTest(
+      "<div contenteditable=\"false\"><div contenteditable=\"\"><br></div></div>",
+      t.name
+    );
+    checkGetTargetRangesOfBeforeinputOnDeleteSomething({
+      startContainer: innerEditingHost,
+      startOffset: 0,
+      endContainer: p,
+      endOffset: 1,
+    });
+    checkGetTargetRangesOfInputOnDeleteSomething();
+  }
+}, 'Backspace at "<div contenteditable="false"><div contenteditable=""><p>{}<br></p></div></div>');
+
+promise_test(async t => {
+  const innerHTML = "<div contenteditable=\"false\">\n  <div contenteditable=\"\"><p><br></p></div></div>";
+  initializeTest(innerHTML);
+  const p = gEditor.querySelector("p");
+  const innerEditingHost = p.parentNode;
+  document.activeElement?.blur();
+  p.parentNode.focus();
+  gSelection.collapse(p, 0);
+  await sendBackspaceKey();
+  if (gEditor.innerHTML == innerHTML) {
+    checkGetTargetRangesOfBeforeinputOnDeleteSomething({
+      startContainer: p,
+      startOffset: 0,
+      endContainer: p,
+      endOffset: 0,
+    });
+    checkGetTargetRangesOfInputOnDoNothing();
+  } else {
+    checkEditorContentResultAsSubTest(
+      "<div contenteditable=\"false\">\n  <div contenteditable=\"\"><br></div></div>",
+      t.name
+    );
+    checkGetTargetRangesOfBeforeinputOnDeleteSomething({
+      startContainer: innerEditingHost,
+      startOffset: 0,
+      endContainer: p,
+      endOffset: 1,
+    });
+    checkGetTargetRangesOfInputOnDeleteSomething();
+  }
+}, 'Backspace at "<div contenteditable="false">\n  <div contenteditable=""><p>{}<br></p></div></div>');
 
 </script>

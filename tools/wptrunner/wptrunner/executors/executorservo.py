@@ -1,4 +1,5 @@
-from __future__ import print_function
+# mypy: allow-untyped-defs
+
 import base64
 import json
 import os
@@ -7,74 +8,45 @@ import tempfile
 import threading
 import traceback
 import uuid
-from six import ensure_str
 
 from mozprocess import ProcessHandler
 
 from tools.serve.serve import make_hosts_file
 
-from .base import (ConnectionlessProtocol,
-                   RefTestImplementation,
+from .base import (RefTestImplementation,
                    crashtest_result_converter,
                    testharness_result_converter,
                    reftest_result_converter,
-                   TimedRunner,
-                   WdspecExecutor,
-                   WdspecProtocol)
+                   TimedRunner)
 from .process import ProcessTestExecutor
+from .protocol import ConnectionlessProtocol
 from ..browsers.base import browser_command
-from ..process import cast_env
-from ..webdriver_server import ServoDriverServer
 
 
 pytestrunner = None
 webdriver = None
 
 
-def write_hosts_file(config):
-    hosts_fd, hosts_path = tempfile.mkstemp()
-    with os.fdopen(hosts_fd, "w") as f:
-        f.write(make_hosts_file(config, "127.0.0.1"))
-    return hosts_path
-
-
-def build_servo_command(test, test_url_func, browser, binary, pause_after_test, debug_info,
-                        extra_args=None, debug_opts="replace-surrogates"):
-    args = [
-        "--hard-fail", "-u", "Servo/wptrunner",
-        "-z", test_url_func(test),
-    ]
-    if debug_opts:
-        args += ["-Z", debug_opts]
-    for stylesheet in browser.user_stylesheets:
-        args += ["--user-stylesheet", stylesheet]
-    for pref, value in test.environment.get('prefs', {}).items():
-        args += ["--pref", "%s=%s" % (pref, value)]
-    if browser.ca_certificate_path:
-        args += ["--certificate-path", browser.ca_certificate_path]
-    if extra_args:
-        args += extra_args
-    args += browser.binary_args
-    debug_args, command = browser_command(binary, args, debug_info)
-    if pause_after_test:
-        command.remove("-z")
-    return debug_args + command
-
-
-
-class ServoTestharnessExecutor(ProcessTestExecutor):
-    convert_result = testharness_result_converter
-
-    def __init__(self, logger, browser, server_config, timeout_multiplier=1, debug_info=None,
-                 pause_after_test=False, **kwargs):
+class ServoExecutor(ProcessTestExecutor):
+    def __init__(self, logger, browser, server_config, timeout_multiplier, debug_info,
+                 pause_after_test, reftest_screenshot="unexpected"):
         ProcessTestExecutor.__init__(self, logger, browser, server_config,
                                      timeout_multiplier=timeout_multiplier,
-                                     debug_info=debug_info)
+                                     debug_info=debug_info,
+                                     reftest_screenshot=reftest_screenshot)
         self.pause_after_test = pause_after_test
-        self.result_data = None
-        self.result_flag = None
+        self.environment = {}
         self.protocol = ConnectionlessProtocol(self, browser)
-        self.hosts_path = write_hosts_file(server_config)
+
+        self.wpt_prefs_path = self.find_wpt_prefs()
+
+        hosts_fd, self.hosts_path = tempfile.mkstemp()
+        with os.fdopen(hosts_fd, "w") as f:
+            f.write(make_hosts_file(server_config, "127.0.0.1"))
+
+        self.env_for_tests = os.environ.copy()
+        self.env_for_tests["HOST_FILE"] = self.hosts_path
+        self.env_for_tests["RUST_BACKTRACE"] = "1"
 
     def teardown(self):
         try:
@@ -83,31 +55,85 @@ class ServoTestharnessExecutor(ProcessTestExecutor):
             pass
         ProcessTestExecutor.teardown(self)
 
+    def on_environment_change(self, new_environment):
+        self.environment = new_environment
+        return super().on_environment_change(new_environment)
+
+    def on_output(self, line):
+        line = line.decode("utf8", "replace")
+        if self.interactive:
+            print(line)
+        else:
+            self.logger.process_output(self.proc.pid, line, " ".join(self.command), self.test.url)
+
+    def find_wpt_prefs(self):
+        default_path = os.path.join("resources", "wpt-prefs.json")
+        # The cwd is the servo repo for `./mach test-wpt`, but on WPT runners
+        # it is the WPT repo. The nightly tar is extracted inside the python
+        # virtual environment within the repo. This means that on WPT runners,
+        # the cwd has the `_venv3/servo` directory inside which we find the
+        # binary and the 'resources' directory.
+        for dir in [".", "./_venv3/servo"]:
+            candidate = os.path.abspath(os.path.join(dir, default_path))
+            if os.path.isfile(candidate):
+                return candidate
+        self.logger.error("Unable to find wpt-prefs.json")
+        return default_path
+
+    def build_servo_command(self, test, extra_args=None, debug_opts="replace-surrogates"):
+        args = [
+            "--hard-fail", "-u", "Servo/wptrunner",
+            # See https://github.com/servo/servo/issues/30080.
+            # For some reason rustls does not like the certificate generated by the WPT tooling.
+            "--ignore-certificate-errors",
+            "-z", self.test_url(test),
+        ]
+        if debug_opts:
+            args += ["-Z", debug_opts]
+        for stylesheet in self.browser.user_stylesheets:
+            args += ["--user-stylesheet", stylesheet]
+        for pref, value in self.environment.get('prefs', {}).items():
+            args += ["--pref", f"{pref}={value}"]
+        args += ["--prefs-file", self.wpt_prefs_path]
+        if self.browser.ca_certificate_path:
+            args += ["--certificate-path", self.browser.ca_certificate_path]
+        if extra_args:
+            args += extra_args
+        args += self.browser.binary_args
+        debug_args, command = browser_command(self.binary, args, self.debug_info)
+        if self.pause_after_test:
+            command.remove("-z")
+        return debug_args + command
+
+
+class ServoTestharnessExecutor(ServoExecutor):
+    convert_result = testharness_result_converter
+
+    def __init__(self, logger, browser, server_config, timeout_multiplier=1, debug_info=None,
+                 pause_after_test=False, **kwargs):
+        ServoExecutor.__init__(self, logger, browser, server_config,
+                               timeout_multiplier=timeout_multiplier,
+                               debug_info=debug_info,
+                               pause_after_test=pause_after_test)
+        self.result_data = None
+        self.result_flag = None
+
     def do_test(self, test):
+        self.test = test
         self.result_data = None
         self.result_flag = threading.Event()
 
-        self.command = build_servo_command(test,
-                                           self.test_url,
-                                           self.browser,
-                                           self.binary,
-                                           self.pause_after_test,
-                                           self.debug_info)
-
-        env = os.environ.copy()
-        env["HOST_FILE"] = self.hosts_path
-        env["RUST_BACKTRACE"] = "1"
-
+        self.command = self.build_servo_command(test)
 
         if not self.interactive:
             self.proc = ProcessHandler(self.command,
                                        processOutputLine=[self.on_output],
                                        onFinish=self.on_finish,
-                                       env=cast_env(env),
+                                       env=self.env_for_tests,
                                        storeOutput=False)
             self.proc.run()
         else:
-            self.proc = subprocess.Popen(self.command, env=cast_env(env))
+            self.proc = subprocess.Popen(self.command, env=self.env_for_tests)
 
         try:
             timeout = test.timeout * self.timeout_multiplier
@@ -127,11 +153,10 @@ class ServoTestharnessExecutor(ProcessTestExecutor):
                     result = self.convert_result(test, self.result_data)
                 else:
                     self.proc.wait()
-                    result = (test.result_cls("CRASH", None), [])
+                    result = (test.make_result("CRASH", None), [])
                     proc_is_running = False
             else:
-                result = (test.result_cls("TIMEOUT", None), [])
-
+                result = (test.make_result("TIMEOUT", None), [])
 
             if proc_is_running:
                 if self.pause_after_test:
@@ -147,23 +172,18 @@ class ServoTestharnessExecutor(ProcessTestExecutor):
 
     def on_output(self, line):
         prefix = "ALERT: RESULT: "
-        line = line.decode("utf8", "replace")
-        if line.startswith(prefix):
-            self.result_data = json.loads(line[len(prefix):])
+        decoded_line = line.decode("utf8", "replace")
+        if decoded_line.startswith(prefix):
+            self.result_data = json.loads(decoded_line[len(prefix):])
             self.result_flag.set()
         else:
-            if self.interactive:
-                print(line)
-            else:
-                self.logger.process_output(self.proc.pid,
-                                           line,
-                                           " ".join(self.command))
+            ServoExecutor.on_output(self, line)
 
     def on_finish(self):
         self.result_flag.set()
 
 
-class TempFilename(object):
+class TempFilename:
     def __init__(self, directory):
         self.directory = directory
         self.path = None
@@ -179,64 +199,49 @@ class TempFilename(object):
             pass
 
 
-class ServoRefTestExecutor(ProcessTestExecutor):
+class ServoRefTestExecutor(ServoExecutor):
     convert_result = reftest_result_converter
 
     def __init__(self, logger, browser, server_config, binary=None, timeout_multiplier=1,
                  screenshot_cache=None, debug_info=None, pause_after_test=False,
-                 **kwargs):
-        ProcessTestExecutor.__init__(self,
-                                     logger,
-                                     browser,
-                                     server_config,
-                                     timeout_multiplier=timeout_multiplier,
-                                     debug_info=debug_info)
+                 reftest_screenshot="unexpected", **kwargs):
+        ServoExecutor.__init__(self,
+                               logger,
+                               browser,
+                               server_config,
+                               timeout_multiplier=timeout_multiplier,
+                               debug_info=debug_info,
+                               reftest_screenshot=reftest_screenshot,
+                               pause_after_test=pause_after_test)
 
-        self.protocol = ConnectionlessProtocol(self, browser)
         self.screenshot_cache = screenshot_cache
+        self.reftest_screenshot = reftest_screenshot
         self.implementation = RefTestImplementation(self)
         self.tempdir = tempfile.mkdtemp()
-        self.hosts_path = write_hosts_file(server_config)
 
     def reset(self):
         self.implementation.reset()
 
     def teardown(self):
-        try:
-            os.unlink(self.hosts_path)
-        except OSError:
-            pass
         os.rmdir(self.tempdir)
-        ProcessTestExecutor.teardown(self)
+        ServoExecutor.teardown(self)
 
     def screenshot(self, test, viewport_size, dpi, page_ranges):
         with TempFilename(self.tempdir) as output_path:
             extra_args = ["--exit",
                           "--output=%s" % output_path,
-                          "--resolution", viewport_size or "800x600"]
+                          "--window-size", viewport_size or "800x600"]
             debug_opts = "disable-text-aa,load-webfonts-synchronously,replace-surrogates"
 
             if dpi:
                 extra_args += ["--device-pixel-ratio", dpi]
 
-            self.command = build_servo_command(test,
-                                               self.test_url,
-                                               self.browser,
-                                               self.binary,
-                                               False,
-                                               self.debug_info,
-                                               extra_args,
-                                               debug_opts)
-
-            env = os.environ.copy()
-            env["HOST_FILE"] = self.hosts_path
-            env["RUST_BACKTRACE"] = "1"
+            self.command = self.build_servo_command(test, extra_args, debug_opts)
 
             if not self.interactive:
                 self.proc = ProcessHandler(self.command,
                                            processOutputLine=[self.on_output],
-                                           env=cast_env(env))
-
+                                           env=self.env_for_tests)
 
                 try:
                     self.proc.run()
@@ -246,8 +251,7 @@ class ServoRefTestExecutor(ProcessTestExecutor):
                     self.proc.kill()
                     raise
             else:
-                self.proc = subprocess.Popen(self.command,
-                                             env=cast_env(env))
+                self.proc = subprocess.Popen(self.command, env=self.env_for_tests)
                 try:
                     rv = self.proc.wait()
                 except KeyboardInterrupt:
@@ -264,35 +268,21 @@ class ServoRefTestExecutor(ProcessTestExecutor):
             with open(output_path, "rb") as f:
                 # Might need to strip variable headers or something here
                 data = f.read()
-                return True, [ensure_str(base64.b64encode(data))]
+                # Returning the screenshot as a string could potentially be avoided,
+                # see https://github.com/web-platform-tests/wpt/issues/28929.
+                return True, [base64.b64encode(data).decode()]
 
     def do_test(self, test):
+        self.test = test
         result = self.implementation.run_test(test)
 
         return self.convert_result(test, result)
-
-    def on_output(self, line):
-        line = line.decode("utf8", "replace")
-        if self.interactive:
-            print(line)
-        else:
-            self.logger.process_output(self.proc.pid,
-                                       line,
-                                       " ".join(self.command))
-
-
-class ServoDriverProtocol(WdspecProtocol):
-    server_cls = ServoDriverServer
-
-
-class ServoWdspecExecutor(WdspecExecutor):
-    protocol_cls = ServoDriverProtocol
 
 
 class ServoTimedRunner(TimedRunner):
     def run_func(self):
         try:
-            self.result = True, self.func(self.protocol, self.url, self.timeout)
+            self.result = (True, self.func(self.protocol, self.url, self.timeout))
         except Exception as e:
             message = getattr(e, "message", "")
             if message:
@@ -306,23 +296,22 @@ class ServoTimedRunner(TimedRunner):
         pass
 
 
-class ServoCrashtestExecutor(ProcessTestExecutor):
+class ServoCrashtestExecutor(ServoExecutor):
     convert_result = crashtest_result_converter
 
     def __init__(self, logger, browser, server_config, binary=None, timeout_multiplier=1,
                  screenshot_cache=None, debug_info=None, pause_after_test=False,
                  **kwargs):
-        ProcessTestExecutor.__init__(self,
-                                     logger,
-                                     browser,
-                                     server_config,
-                                     timeout_multiplier=timeout_multiplier,
-                                     debug_info=debug_info)
+        ServoExecutor.__init__(self,
+                               logger,
+                               browser,
+                               server_config,
+                               timeout_multiplier=timeout_multiplier,
+                               debug_info=debug_info,
+                               pause_after_test=pause_after_test)
 
         self.pause_after_test = pause_after_test
         self.protocol = ConnectionlessProtocol(self, browser)
-        self.tempdir = tempfile.mkdtemp()
-        self.hosts_path = write_hosts_file(server_config)
 
     def do_test(self, test):
         timeout = (test.timeout * self.timeout_multiplier if self.debug_info is None
@@ -340,32 +329,22 @@ class ServoCrashtestExecutor(ProcessTestExecutor):
         if success:
             return self.convert_result(test, data)
 
-        return (test.result_cls(*data), [])
+        return (test.make_result(*data), [])
 
     def do_crashtest(self, protocol, url, timeout):
-        env = os.environ.copy()
-        env["HOST_FILE"] = self.hosts_path
-        env["RUST_BACKTRACE"] = "1"
-
-        command = build_servo_command(self.test,
-                                      self.test_url,
-                                      self.browser,
-                                      self.binary,
-                                      False,
-                                      self.debug_info,
-                                      extra_args=["-x"])
+        self.command = self.build_servo_command(self.test, extra_args=["-x"])
 
         if not self.interactive:
-            self.proc = ProcessHandler(command,
-                                       env=cast_env(env),
+            self.proc = ProcessHandler(self.command,
+                                       env=self.env_for_tests,
+                                       processOutputLine=[self.on_output],
                                        storeOutput=False)
             self.proc.run()
         else:
-            self.proc = subprocess.Popen(command, env=cast_env(env))
+            self.proc = subprocess.Popen(self.command, env=self.env_for_tests)
 
         self.proc.wait()
 
         if self.proc.poll() >= 0:
             return {"status": "PASS", "message": None}
-
         return {"status": "CRASH", "message": None}

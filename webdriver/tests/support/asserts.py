@@ -1,19 +1,12 @@
-import base64
 import imghdr
-import struct
+from base64 import decodebytes
 
-import six
+from webdriver import NoSuchAlertException, WebDriverException, WebElement
 
-from webdriver import Element, NoSuchAlertException, WebDriverException
-
-
-def decodebytes(s):
-    if six.PY3:
-        return base64.decodebytes(six.ensure_binary(s))
-    return base64.decodestring(s)
 
 # WebDriver specification ID: dfn-error-response-data
 errors = {
+    "detached shadow root": 404,
     "element click intercepted": 400,
     "element not selectable": 400,
     "element not interactable": 400,
@@ -30,6 +23,7 @@ errors = {
     "no such cookie": 404,
     "no such element": 404,
     "no such frame": 404,
+    "no such shadow root": 404,
     "no such window": 404,
     "script timeout": 500,
     "session not created": 500,
@@ -57,8 +51,8 @@ def assert_error(response, error_code):
     assert response.status == errors[error_code]
     assert "value" in response.body
     assert response.body["value"]["error"] == error_code
-    assert isinstance(response.body["value"]["message"], six.text_type)
-    assert isinstance(response.body["value"]["stacktrace"], six.text_type)
+    assert isinstance(response.body["value"]["message"], str)
+    assert isinstance(response.body["value"]["stacktrace"], str)
     assert_response_headers(response.headers)
 
 
@@ -154,17 +148,17 @@ def assert_is_active_element(session, element):
 def assert_same_element(session, a, b):
     """Verify that two element references describe the same element."""
     if isinstance(a, dict):
-        assert Element.identifier in a, "Actual value does not describe an element"
-        a_id = a[Element.identifier]
-    elif isinstance(a, Element):
+        assert WebElement.identifier in a, "Actual value does not describe an element"
+        a_id = a[WebElement.identifier]
+    elif isinstance(a, WebElement):
         a_id = a.id
     else:
         raise AssertionError("Actual value is not a dictionary or web element")
 
     if isinstance(b, dict):
-        assert Element.identifier in b, "Expected value does not describe an element"
-        b_id = b[Element.identifier]
-    elif isinstance(b, Element):
+        assert WebElement.identifier in b, "Expected value does not describe an element"
+        b_id = b[WebElement.identifier]
+    elif isinstance(b, WebElement):
         b_id = b.id
     else:
         raise AssertionError("Expected value is not a dictionary or web element")
@@ -217,8 +211,22 @@ def assert_move_to_coordinates(point, target, events):
             assert e["target"] == target
 
 
+def assert_pdf(value):
+    data = decodebytes(value.encode())
+
+    assert data.startswith(b"%PDF-"), "Decoded data starts with the PDF signature"
+    assert data.endswith(b"%%EOF\n"), "Decoded data ends with the EOF flag"
+
+
 def assert_png(screenshot):
-    """Test that screenshot is a Base64 encoded PNG file."""
-    image = decodebytes(six.ensure_binary(screenshot))
+    """Test that screenshot is a Base64 encoded PNG file, or a bytestring representing a PNG.
+
+    Returns the bytestring for the PNG, if the assert passes
+    """
+    if type(screenshot) is str:
+        image = decodebytes(screenshot.encode())
+    else:
+        image = screenshot
     mime_type = imghdr.what("", image)
     assert mime_type == "png", "Expected image to be PNG, but it was {}".format(mime_type)
+    return image

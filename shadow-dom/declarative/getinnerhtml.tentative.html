@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <title>getInnerHTML </title>
-<link rel='author' title='Mason Freed' href='mailto:masonfreed@chromium.org'>
+<link rel='author' href='mailto:masonf@chromium.org'>
 <link rel='help' href='https://github.com/whatwg/dom/issues/831'>
 <script src='/resources/testharness.js'></script>
 <script src='/resources/testharnessreport.js'></script>
-<script src='../resources/shadow-dom-utils.js'></script>
+<script src='../../html/resources/common.js'></script>
 
 <body>
 
@@ -29,8 +29,9 @@ function testElementType(allowsShadowDom, elementType, applyToShadow, mode, dele
     const isOpen = mode === 'open';
     if (allowsShadowDom) {
       const delegatesAttr = delegatesFocus ? ' shadowrootdelegatesfocus=""' : '';
-      const correctShadowHtml = `<template shadowroot="${mode}"${delegatesAttr}><slot></slot></template>`;
+      const correctShadowHtml = `<template shadowrootmode="${mode}"${delegatesAttr}><slot></slot></template>`;
       const correctHtml = `<${elementType}>${correctShadowHtml}</${elementType}>`;
+      const emptyElement = `<${elementType}></${elementType}>`;
       const shadowRoot = element.attachShadow({mode: mode, delegatesFocus: delegatesFocus});
       shadowRoot.appendChild(document.createElement('slot'));
       if (isOpen) {
@@ -38,11 +39,12 @@ function testElementType(allowsShadowDom, elementType, applyToShadow, mode, dele
         assert_equals(wrapper.getInnerHTML(),correctHtml,'The default for includeShadowRoots should be true');
       } else {
         // Closed shadow roots should not be returned unless closedRoots contains the shadow root:
-        const emptyElement = `<${elementType}></${elementType}>`;
         assert_equals(wrapper.getInnerHTML({includeShadowRoots: true}), emptyElement);
         assert_equals(wrapper.getInnerHTML({includeShadowRoots: true, closedRoots: []}), emptyElement);
       }
       assert_equals(wrapper.getInnerHTML({includeShadowRoots: true, closedRoots: [shadowRoot]}),correctHtml);
+      // ClosedRoots are not included if includeShadowRoots is false:
+      assert_equals(wrapper.getInnerHTML({includeShadowRoots: false, closedRoots: [shadowRoot]}),emptyElement);
     } else {
       // For non-shadow hosts, getInnerHTML() should also match .innerHTML
       assert_equals(wrapper.getInnerHTML({includeShadowRoots: true}),wrapper.innerHTML);
@@ -56,8 +58,8 @@ function testElementType(allowsShadowDom, elementType, applyToShadow, mode, dele
 }
 
 function runAllTests() {
-  const allElements = [...HTML5_ELEMENT_NAMES, 'htmlunknown'];
-  const safelisted = ATTACHSHADOW_SAFELISTED_ELEMENTS;
+  const allElements = [...HTML5_ELEMENTS, 'htmlunknown'];
+  const safelisted = HTML5_SHADOW_ALLOWED_ELEMENTS;
   for (const elementName of allElements) {
     const allowsShadowDom = safelisted.includes(elementName);
     for (const applyToShadow of [false, true]) {

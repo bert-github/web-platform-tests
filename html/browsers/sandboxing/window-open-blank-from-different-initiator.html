@@ -30,7 +30,7 @@ const runTest = (description, createNewPopup) => {
   promise_test(async test => {
     // Open a same-origin window with a different CSP.
     const executor_path =
-      "/html/browsers/sandboxing/resources/executor.html?pipe=";
+      "/html/browsers/sandboxing/resources/execute-postmessage.html?pipe=";
     const csp = "|header(Content-Security-Policy, " +
                 "sandbox" +
                 " allow-scripts" +
@@ -68,8 +68,7 @@ const runTest = (description, createNewPopup) => {
 // Open a new window and start loading from an unresponsive server. The frame
 // will be left with the initial empty document and a pending navigation.
 runTest("One pending navigation", async (test, popup_name) => {
-  const unresponsive_path =
-    "/fetch/api/resources/infinite-slow-response.py";
+  const unresponsive_path = "/common/slow.py?delay=1000000";
   return window.open(same_origin + unresponsive_path, popup_name);
 });
 

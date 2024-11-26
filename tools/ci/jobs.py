@@ -1,6 +1,10 @@
+# mypy: allow-untyped-defs
+
 import argparse
+import json
 import os
 import re
+import sys
 from ..wpt.testfiles import branch_point, files_changed
 
 from tools import localpaths  # noqa: F401
@@ -21,7 +25,7 @@ EXCLUDES = [
 ]
 
 # Rules are just regex on the path, with a leading ! indicating a regex that must not
-# match for the job
+# match for the job. Paths should be kept in sync with scripts in update_built.py.
 job_path_map = {
     "affected_tests": [".*/.*", "!resources/(?!idlharness.js)"] + EXCLUDES,
     "stability": [".*/.*", "!resources/.*"] + EXCLUDES,
@@ -30,13 +34,14 @@ job_path_map = {
     "resources_unittest": ["resources/", "tools/"],
     "tools_unittest": ["tools/"],
     "wptrunner_unittest": ["tools/"],
-    "build_css": ["css/"],
-    "update_built": ["update-built-tests\\.sh",
-                     "infrastructure/",
-                     "html/",
-                     "mimesniff/",
+    "update_built": ["conformance-checkers/",
+                     "css/css-images/",
                      "css/css-ui/",
-                     "WebIDL"],
+                     "css/css-writing-modes/",
+                     "fetch/metadata/",
+                     "html/",
+                     "infrastructure/",
+                     "mimesniff/"],
     "wpt_integration": ["tools/"],
     "wptrunner_infrastructure": ["infrastructure/",
                                  "tools/",
@@ -54,7 +59,7 @@ def _path_norm(path):
     return path
 
 
-class Ruleset(object):
+class Ruleset:
     def __init__(self, rules):
         self.include = []
         self.exclude = []
@@ -93,7 +98,7 @@ def get_paths(**kwargs):
     else:
         revish = kwargs["revish"]
 
-    changed, _ = files_changed(revish)
+    changed, _ = files_changed(revish, ignore_rules=[])
     all_changed = {os.path.relpath(item, wpt_root) for item in set(changed)}
     return all_changed
 
@@ -121,7 +126,7 @@ def get_jobs(paths, **kwargs):
         if not rules:
             break
 
-    # Default jobs shuld run even if there were no changes
+    # Default jobs should run even if there were no changes
     if not paths:
         for job, path_re in job_path_map.items():
             if ".*" in path_re:
@@ -135,6 +140,7 @@ def create_parser():
     parser.add_argument("revish", default=None, help="Commits to consider. Defaults to the commits on the current branch", nargs="?")
     parser.add_argument("--all", help="List all jobs unconditionally.", action="store_true")
     parser.add_argument("--includes", default=None, help="Jobs to check for. Return code is 0 if all jobs are found, otherwise 1", nargs="*")
+    parser.add_argument("--json", action="store_true", help="Output jobs as JSON, instead of one per line")
     return parser
 
 
@@ -142,7 +148,11 @@ def run(**kwargs):
     paths = get_paths(**kwargs)
     jobs = get_jobs(paths, **kwargs)
     if not kwargs["includes"]:
-        for item in sorted(jobs):
-            print(item)
+        if kwargs["json"]:
+            json.dump(sorted(jobs), sys.stdout, indent=2)
+            sys.stdout.write("\n")
+        else:
+            for item in sorted(jobs):
+                print(item)
     else:
         return 0 if set(kwargs["includes"]).issubset(jobs) else 1

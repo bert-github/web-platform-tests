@@ -18,7 +18,7 @@ interface PaymentRequest : EventTarget {
   Promise<boolean> canMakePayment();
 
   readonly attribute DOMString id;
-  readonly attribute PaymentAddress? shippingAddress;
+  readonly attribute ContactAddress? shippingAddress;
   readonly attribute DOMString? shippingOption;
   readonly attribute PaymentShippingType? shippingType;
 
@@ -84,45 +84,14 @@ dictionary PaymentItem {
   boolean pending = false;
 };
 
-[SecureContext, Exposed=(Window)]
-interface PaymentAddress {
-  [Default] object toJSON();
-  readonly attribute DOMString city;
-  readonly attribute DOMString country;
-  readonly attribute DOMString dependentLocality;
-  readonly attribute DOMString organization;
-  readonly attribute DOMString phone;
-  readonly attribute DOMString postalCode;
-  readonly attribute DOMString recipient;
-  readonly attribute DOMString region;
-  readonly attribute DOMString sortingCode;
-  readonly attribute FrozenArray<DOMString> addressLine;
+dictionary PaymentCompleteDetails {
+  object? data = null;
 };
 
-dictionary AddressInit {
-  DOMString country = "";
-  sequence<DOMString> addressLine = [];
-  DOMString region = "";
-  DOMString city = "";
-  DOMString dependentLocality = "";
-  DOMString postalCode = "";
-  DOMString sortingCode = "";
-  DOMString organization = "";
-  DOMString recipient = "";
-  DOMString phone = "";
-};
-
-dictionary AddressErrors {
-  DOMString addressLine;
-  DOMString city;
-  DOMString country;
-  DOMString dependentLocality;
-  DOMString organization;
-  DOMString phone;
-  DOMString postalCode;
-  DOMString recipient;
-  DOMString region;
-  DOMString sortingCode;
+enum PaymentComplete {
+  "fail",
+  "success",
+  "unknown"
 };
 
 dictionary PaymentShippingOption {
@@ -132,12 +101,6 @@ dictionary PaymentShippingOption {
   boolean selected = false;
 };
 
-enum PaymentComplete {
-  "fail",
-  "success",
-  "unknown"
-};
-
 [SecureContext, Exposed=Window]
 interface PaymentResponse : EventTarget  {
   [Default] object toJSON();
@@ -145,14 +108,17 @@ interface PaymentResponse : EventTarget  {
   readonly attribute DOMString requestId;
   readonly attribute DOMString methodName;
   readonly attribute object details;
-  readonly attribute PaymentAddress? shippingAddress;
+  readonly attribute ContactAddress? shippingAddress;
   readonly attribute DOMString? shippingOption;
   readonly attribute DOMString? payerName;
   readonly attribute DOMString? payerEmail;
   readonly attribute DOMString? payerPhone;
 
   [NewObject]
-  Promise<undefined> complete(optional PaymentComplete result = "unknown");
+  Promise<undefined> complete(
+    optional PaymentComplete result = "unknown",
+    optional PaymentCompleteDetails details = {}
+  );
   [NewObject]
   Promise<undefined> retry(optional PaymentValidationErrors errorFields = {});
 
@@ -170,6 +136,19 @@ dictionary PayerErrors {
   DOMString email;
   DOMString name;
   DOMString phone;
+};
+
+dictionary AddressErrors {
+  DOMString addressLine;
+  DOMString city;
+  DOMString country;
+  DOMString dependentLocality;
+  DOMString organization;
+  DOMString phone;
+  DOMString postalCode;
+  DOMString recipient;
+  DOMString region;
+  DOMString sortingCode;
 };
 
 [SecureContext, Exposed=Window]

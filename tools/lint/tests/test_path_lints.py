@@ -1,9 +1,9 @@
-from __future__ import unicode_literals
+# mypy: allow-untyped-defs
 
-import mock
 import os
+from unittest import mock
 
-from ..lint import check_path
+from ..lint import check_path, check_unique_case_insensitive_paths
 from .base import check_errors
 import pytest
 
@@ -24,7 +24,7 @@ def test_forbidden_path_length():
 
     for idx in range(5, 10):
         filename = basename + idx * "a"
-        message = "/%s longer than maximum path length (%s > 150)" % (filename, 146 + idx)
+        message = f"/{filename} longer than maximum path length ({146 + idx} > 150)"
 
         errors = check_path("/foo/", filename)
         check_errors(errors)
@@ -48,7 +48,7 @@ def test_forbidden_path_endings(path_ending, generated):
 def test_file_type():
     path = "test/test"
 
-    message = "/%s is an unsupported file type (symlink)" % (path,)
+    message = f"/{path} is an unsupported file type (symlink)"
 
     with mock.patch("os.path.islink", returnvalue=True):
         errors = check_path("/foo/", path)
@@ -121,8 +121,7 @@ def test_tentative_directories_negative(path):
                                   "else/where/.gitignore"
                                   "elsewhere/tools/.gitignore",
                                   "elsewhere/docs/.gitignore",
-                                  "elsewhere/resources/webidl2/.gitignore",
-                                  "elsewhere/css/tools/apiclient/.gitignore"])
+                                  "elsewhere/resources/webidl2/.gitignore"])
 def test_gitignore_file(path):
     path = os.path.join(*path.split("/"))
 
@@ -144,12 +143,22 @@ def test_gitignore_file(path):
                                   "docs/.gitignore"
                                   "docs/elsewhere/.gitignore",
                                   "resources/webidl2/.gitignore",
-                                  "resources/webidl2/elsewhere/.gitignore",
-                                  "css/tools/apiclient/.gitignore",
-                                  "css/tools/apiclient/elsewhere/.gitignore"])
+                                  "resources/webidl2/elsewhere/.gitignore"])
 def test_gitignore_negative(path):
     path = os.path.join(*path.split("/"))
 
     errors = check_path("/foo/", path)
 
     assert errors == []
+
+
+@pytest.mark.parametrize("paths,errors",
+                         [(["a/b.html", "a/B.html"], ["a/B.html"]),
+                          (["A/b.html", "a/b.html"], ["a/b.html"]),
+                          (["a/b.html", "a/c.html"], [])])
+def test_unique_case_insensitive_paths(paths, errors):
+    got_errors = check_unique_case_insensitive_paths(None, paths)
+    assert len(got_errors) == len(errors)
+    for (name, _, path, _), expected_path in zip(got_errors, errors):
+        assert name == "DUPLICATE-CASE-INSENSITIVE-PATH"
+        assert path == expected_path

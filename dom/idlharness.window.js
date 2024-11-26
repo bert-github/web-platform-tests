@@ -11,7 +11,7 @@
 'use strict';
 
 idl_test(
-  ['dom'],
+  ['dom', 'fullscreen'],
   ['html'],
   idl_array => {
     self.xmlDoc = document.implementation.createDocument(null, '', null);
@@ -46,6 +46,7 @@ idl_test(
       XPathExpression: ['document.createExpression("//*")'],
       XPathNSResolver: ['document.createNSResolver(document.body)'],
       XPathResult: ['document.evaluate("//*", document.body)'],
+      XSLTProcessor: ['new XSLTProcessor()'],
     });
   }
 );

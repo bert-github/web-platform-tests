@@ -299,6 +299,15 @@ test_blob(function() {
 });
 test_blob(function() {
   return new Blob([
+    new Float16Array([2.65625, 58.59375])
+  ]);
+}, {
+  expected: "PASS",
+  type: "",
+  desc: "Passing a Float16Array as element of the blobParts array should work."
+});
+test_blob(function() {
+  return new Blob([
     // 0x535 3415053534150
     // 0x535 = 0b010100110101 -> Sign = +, Exponent = 1333 - 1023 = 310
     // 0x13415053534150 * 2**(-52)
@@ -311,7 +320,16 @@ test_blob(function() {
   desc: "Passing a Float64Array as element of the blobParts array should work."
 });
 
-
+test_blob(function() {
+  return new Blob([
+    new BigInt64Array([BigInt("0x5353415053534150")]),
+    new BigUint64Array([BigInt("0x5353415053534150")])
+  ]);
+}, {
+  expected: "PASSPASSPASSPASS",
+  type: "",
+  desc: "Passing BigInt typed arrays as elements of the blobParts array should work."
+});
 
 var t_ports = async_test("Passing a FrozenArray as the blobParts array should work (FrozenArray<MessagePort>).");
 t_ports.step(function() {

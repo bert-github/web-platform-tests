@@ -1,4 +1,7 @@
-import mock
+# mypy: allow-untyped-defs
+
+from unittest import mock
+
 import pytest
 
 from tools.ci.tc import decision

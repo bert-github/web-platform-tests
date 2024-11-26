@@ -18,6 +18,7 @@ def main(request, response):
   ## Handle the header retrieval request ##
   if b'retrieve' in request.GET:
     response.writer.write_status(200)
+    response.writer.write_header(b"Connection", b"close")
     response.writer.end_headers()
     try:
       header_value = request.server.stash.take(testId)
@@ -122,19 +123,10 @@ def main(request, response):
       response.headers.set(b"Content-Type", b"application/javascript")
       return b"self.postMessage('loaded');"
 
-    ## Return an appcache manifest
-    if key.startswith(b"appcache-manifest"):
-      response.headers.set(b"Content-Type", b"text/cache-manifest")
-      return b"""CACHE MANIFEST
-/fetch/metadata/resources/record-header.py?file=appcache-resource%s
-
-NETWORK:
-*""" % key[17:]
-
-    ## Return an appcache resource
-    if key.startswith(b"appcache-resource"):
-      response.headers.set(b"Content-Type", b"text/html")
-      return b"<html>Appcache!</html>"
+    ## Return a valid worklet
+    if key.startswith(b"worklet"):
+      response.headers.set(b"Content-Type", b"application/javascript")
+      return b""
 
     ## Return a valid XSLT
     if key.startswith(b"xslt"):
@@ -147,3 +139,7 @@ NETWORK:
     </xsl:copy>
   </xsl:template>
 </xsl:stylesheet>"""
+
+    if key.startswith(b"script"):
+      response.headers.set(b"Content-Type", b"application/javascript")
+      return b"void 0;"

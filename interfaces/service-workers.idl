@@ -8,7 +8,7 @@ interface ServiceWorker : EventTarget {
   readonly attribute USVString scriptURL;
   readonly attribute ServiceWorkerState state;
   undefined postMessage(any message, sequence<object> transfer);
-  undefined postMessage(any message, optional PostMessageOptions options = {});
+  undefined postMessage(any message, optional StructuredSerializeOptions options = {});
 
   // event
   attribute EventHandler onstatechange;
@@ -60,9 +60,9 @@ interface ServiceWorkerContainer : EventTarget {
   readonly attribute ServiceWorker? controller;
   readonly attribute Promise<ServiceWorkerRegistration> ready;
 
-  [NewObject] Promise<ServiceWorkerRegistration> register(USVString scriptURL, optional RegistrationOptions options = {});
+  [NewObject] Promise<ServiceWorkerRegistration> register((TrustedScriptURL or USVString) scriptURL, optional RegistrationOptions options = {});
 
-  [NewObject] Promise<any> getRegistration(optional USVString clientURL = "");
+  [NewObject] Promise<(ServiceWorkerRegistration or undefined)> getRegistration(optional USVString clientURL = "");
   [NewObject] Promise<FrozenArray<ServiceWorkerRegistration>> getRegistrations();
 
   undefined startMessages();
@@ -92,7 +92,7 @@ dictionary NavigationPreloadState {
   ByteString headerValue;
 };
 
-[Global=(Worker,ServiceWorker), Exposed=ServiceWorker]
+[Global=(Worker,ServiceWorker), Exposed=ServiceWorker, SecureContext]
 interface ServiceWorkerGlobalScope : WorkerGlobalScope {
   [SameObject] readonly attribute Clients clients;
   [SameObject] readonly attribute ServiceWorkerRegistration registration;
@@ -115,12 +115,12 @@ interface Client {
   readonly attribute DOMString id;
   readonly attribute ClientType type;
   undefined postMessage(any message, sequence<object> transfer);
-  undefined postMessage(any message, optional PostMessageOptions options = {});
+  undefined postMessage(any message, optional StructuredSerializeOptions options = {});
 };
 
 [Exposed=ServiceWorker]
 interface WindowClient : Client {
-  readonly attribute VisibilityState visibilityState;
+  readonly attribute DocumentVisibilityState visibilityState;
   readonly attribute boolean focused;
   [SameObject] readonly attribute FrozenArray<USVString> ancestorOrigins;
   [NewObject] Promise<WindowClient> focus();
@@ -137,7 +137,7 @@ enum FrameType {
 [Exposed=ServiceWorker]
 interface Clients {
   // The objects returned will be new instances every time
-  [NewObject] Promise<any> get(DOMString id);
+  [NewObject] Promise<(Client or undefined)> get(DOMString id);
   [NewObject] Promise<FrozenArray<Client>> matchAll(optional ClientQueryOptions options = {});
   [NewObject] Promise<WindowClient?> openWindow(USVString url);
   [NewObject] Promise<undefined> claim();
@@ -163,6 +163,42 @@ interface ExtendableEvent : Event {
 
 dictionary ExtendableEventInit : EventInit {
   // Defined for the forward compatibility across the derived events
+};
+
+[Exposed=ServiceWorker]
+interface InstallEvent : ExtendableEvent {
+  constructor(DOMString type, optional ExtendableEventInit eventInitDict = {});
+  Promise<undefined> addRoutes((RouterRule or sequence<RouterRule>) rules);
+};
+
+dictionary RouterRule {
+  required RouterCondition condition;
+  required RouterSource source;
+};
+
+dictionary RouterCondition {
+  URLPatternCompatible urlPattern;
+  ByteString requestMethod;
+  RequestMode requestMode;
+  RequestDestination requestDestination;
+  RunningStatus runningStatus;
+
+  sequence<RouterCondition> _or;
+  RouterCondition not;
+};
+
+typedef (RouterSourceDict or RouterSourceEnum) RouterSource;
+
+dictionary RouterSourceDict {
+  DOMString cacheName;
+};
+
+enum RunningStatus { "running", "not-running" };
+enum RouterSourceEnum {
+  "cache",
+  "fetch-event",
+  "network",
+  "race-network-and-fetch-handler"
 };
 
 [Exposed=ServiceWorker]
@@ -211,7 +247,7 @@ partial interface mixin WindowOrWorkerGlobalScope {
 
 [SecureContext, Exposed=(Window,Worker)]
 interface Cache {
-  [NewObject] Promise<any> match(RequestInfo request, optional CacheQueryOptions options = {});
+  [NewObject] Promise<(Response or undefined)> match(RequestInfo request, optional CacheQueryOptions options = {});
   [NewObject] Promise<FrozenArray<Response>> matchAll(optional RequestInfo request, optional CacheQueryOptions options = {});
   [NewObject] Promise<undefined> add(RequestInfo request);
   [NewObject] Promise<undefined> addAll(sequence<RequestInfo> requests);
@@ -228,7 +264,7 @@ dictionary CacheQueryOptions {
 
 [SecureContext, Exposed=(Window,Worker)]
 interface CacheStorage {
-  [NewObject] Promise<any> match(RequestInfo request, optional MultiCacheQueryOptions options = {});
+  [NewObject] Promise<(Response or undefined)> match(RequestInfo request, optional MultiCacheQueryOptions options = {});
   [NewObject] Promise<boolean> has(DOMString cacheName);
   [NewObject] Promise<Cache> open(DOMString cacheName);
   [NewObject] Promise<boolean> delete(DOMString cacheName);

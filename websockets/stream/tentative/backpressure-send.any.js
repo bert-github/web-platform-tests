@@ -1,7 +1,9 @@
-// META: script=../../websocket.sub.js
+// META: script=../../constants.sub.js
 // META: script=resources/url-constants.js
 // META: global=window,worker
 // META: timeout=long
+// META: variant=?wss
+// META: variant=?wpt_flags=h2
 
 // Allow for this much timer jitter.
 const JITTER_ALLOWANCE_MS = 200;
@@ -14,7 +16,7 @@ const MESSAGE_SIZE = 8 * 1024 * 1024;
 // times how long it takes to send the first message.
 promise_test(async t => {
   const wss = new WebSocketStream(`${BASEURL}/receive-backpressure`);
-  const { writable } = await wss.connection;
+  const { writable } = await wss.opened;
   const writer = writable.getWriter();
   const start = performance.now();
   await writer.write(new Uint8Array(MESSAGE_SIZE));

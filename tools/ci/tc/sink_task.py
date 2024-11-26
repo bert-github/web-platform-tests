@@ -1,8 +1,9 @@
+# mypy: allow-untyped-defs
+
 import argparse
 import logging
 import os
 
-from six import ensure_text
 import taskcluster
 
 from .github_checks_output import get_gh_checks_outputter
@@ -23,10 +24,10 @@ def check_task_statuses(task_ids, github_checks_outputter):
         status = queue.status(task)
         state = status['status']['state']
         if state == 'failed' or state == 'exception':
-            logger.error('Task {0} failed with state "{1}"'.format(task, state))
+            logger.error(f'Task {task} failed with state "{state}"')
             failed_tasks.append(status)
         elif state != 'completed':
-            logger.error('Task {0} had unexpected state "{1}"'.format(task, state))
+            logger.error(f'Task {task} had unexpected state "{state}"')
             failed_tasks.append(status)
 
     if failed_tasks and github_checks_outputter:
@@ -45,7 +46,7 @@ def check_task_statuses(task_ids, github_checks_outputter):
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--github-checks-text-file", type=ensure_text,
+    parser.add_argument("--github-checks-text-file", type=str,
             help="Path to GitHub checks output file for Taskcluster runs")
     parser.add_argument("tasks", nargs="+",
             help="A set of Taskcluster task ids to verify the state of.")

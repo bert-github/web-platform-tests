@@ -28,19 +28,20 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-"""Tests for handshake._base module."""
+"""Tests for handshake.base module."""
 
 from __future__ import absolute_import
+
 import unittest
 
-import set_sys_path  # Update sys.path to locate mod_pywebsocket module.
-
-from mod_pywebsocket.common import ExtensionParameter
-from mod_pywebsocket.common import ExtensionParsingException
-from mod_pywebsocket.common import format_extensions
-from mod_pywebsocket.common import parse_extensions
-from mod_pywebsocket.handshake._base import HandshakeException
-from mod_pywebsocket.handshake._base import validate_subprotocol
+import set_sys_path  # Update sys.path to locate pywebsocket3 module.
+from pywebsocket3.common import (
+    ExtensionParameter,
+    ExtensionParsingException,
+    format_extensions,
+    parse_extensions,
+)
+from pywebsocket3.handshake.base import HandshakeException, validate_subprotocol
 
 
 class ValidateSubprotocolTest(unittest.TestCase):

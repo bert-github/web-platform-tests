@@ -1,6 +1,10 @@
-import sys
+# mypy: allow-untyped-defs
 
-import mock
+import gc
+import logging
+import sys
+from unittest import mock
+
 import pytest
 
 from os.path import join, dirname
@@ -10,6 +14,14 @@ sys.path.insert(0, join(dirname(__file__), "..", "..", ".."))
 sauce = pytest.importorskip("wptrunner.browsers.sauce")
 
 from wptserve.config import ConfigBuilder
+
+logger = logging.getLogger()
+
+
+def setup_module(module):
+    # Do a full GC collection, as mozprocess often creates garbage which then
+    # breaks when its __del__ is called while subprocess.Popen is mocked below.
+    gc.collect()
 
 
 def test_sauceconnect_success():
@@ -29,7 +41,7 @@ def test_sauceconnect_success():
             sauce_connect_binary="ddd",
             sauce_connect_args=[])
 
-        with ConfigBuilder(browser_host="example.net") as env_config:
+        with ConfigBuilder(logger, browser_host="example.net") as env_config:
             sauce_connect(None, env_config)
             with sauce_connect:
                 pass
@@ -59,7 +71,7 @@ def test_sauceconnect_failure_exit(readyfile, returncode):
             sauce_connect_binary="ddd",
             sauce_connect_args=[])
 
-        with ConfigBuilder(browser_host="example.net") as env_config:
+        with ConfigBuilder(logger, browser_host="example.net") as env_config:
             sauce_connect(None, env_config)
             with pytest.raises(sauce.SauceException):
                 with sauce_connect:
@@ -88,7 +100,7 @@ def test_sauceconnect_cleanup():
             sauce_connect_binary="ddd",
             sauce_connect_args=[])
 
-        with ConfigBuilder(browser_host="example.net") as env_config:
+        with ConfigBuilder(logger, browser_host="example.net") as env_config:
             sauce_connect(None, env_config)
             with sauce_connect:
                 Popen.return_value.poll.return_value = None
@@ -112,7 +124,7 @@ def test_sauceconnect_failure_never_ready():
             sauce_connect_binary="ddd",
             sauce_connect_args=[])
 
-        with ConfigBuilder(browser_host="example.net") as env_config:
+        with ConfigBuilder(logger, browser_host="example.net") as env_config:
             sauce_connect(None, env_config)
             with pytest.raises(sauce.SauceException):
                 with sauce_connect:
@@ -141,7 +153,8 @@ def test_sauceconnect_tunnel_domains():
             sauce_connect_binary="ddd",
             sauce_connect_args=[])
 
-        with ConfigBuilder(browser_host="example.net",
+        with ConfigBuilder(logger,
+                           browser_host="example.net",
                            alternate_hosts={"alt": "example.org"},
                            subdomains={"a", "b"},
                            not_subdomains={"x", "y"}) as env_config:

@@ -1,5 +1,7 @@
+// META: global=window,dedicatedworker,shadowrealm
+
 "use strict";
-// https://heycam.github.io/webidl/#es-namespaces
+// https://webidl.spec.whatwg.org/#es-namespaces
 // https://console.spec.whatwg.org/#console-namespace
 
 test(() => {

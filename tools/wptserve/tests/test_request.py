@@ -1,4 +1,4 @@
-import mock
+from unittest import mock
 
 from wptserve.request import Request, RequestHeaders, MultiDict
 
@@ -28,7 +28,7 @@ class MockHTTPMessage(dict):
 
     def getallmatchingheaders(self, key):
         values = dict.__getitem__(self, key.lower())
-        return ["{}: {}\n".format(key, v) for v in values]
+        return [f"{key}: {v}\n" for v in values]
 
 
 def test_request_headers_get():

@@ -1,4 +1,5 @@
 import * as vrMojom from '/gen/device/vr/public/mojom/vr_service.mojom.m.js';
+import * as xrSessionMojom from '/gen/device/vr/public/mojom/xr_session.mojom.m.js';
 import {GamepadHand, GamepadMapping} from '/gen/device/gamepad/public/mojom/gamepad.mojom.m.js';
 
 // This polyfill library implements the WebXR Test API as specified here:
@@ -59,17 +60,24 @@ function composeGFXTransform(fakeTransformInit) {
   return {matrix: getMatrixFromTransform(fakeTransformInit)};
 }
 
+// Value equality for camera image init objects - they must contain `width` &
+// `height` properties and may contain `pixels` property.
+function isSameCameraImageInit(rhs, lhs) {
+  return lhs.width === rhs.width && lhs.height === rhs.height && lhs.pixels === rhs.pixels;
+}
+
 class ChromeXRTest {
   constructor() {
     this.mockVRService_ = new MockVRService();
   }
 
+  // WebXR Test API
   simulateDeviceConnection(init_params) {
-    return Promise.resolve(this.mockVRService_.addRuntime(init_params));
+    return Promise.resolve(this.mockVRService_._addRuntime(init_params));
   }
 
   disconnectAllDevices() {
-    this.mockVRService_.removeAllRuntimes();
+    this.mockVRService_._removeAllRuntimes();
     return Promise.resolve();
   }
 
@@ -102,6 +110,7 @@ class ChromeXRTest {
     test_driver.click(button);
   }
 
+  // Helper method leveraged by chrome-specific setups.
   Debug(name, msg) {
     console.log(new Date().toISOString() + ' DEBUG[' + name + '] ' + msg);
   }
@@ -122,8 +131,8 @@ class MockVRService {
     this.interceptor_.start();
   }
 
-  // Test methods
-  addRuntime(fakeDeviceInit) {
+  // WebXR Test API Implementation Helpers
+  _addRuntime(fakeDeviceInit) {
     const runtime = new MockRuntime(fakeDeviceInit, this);
     this.runtimes_.push(runtime);
 
@@ -134,7 +143,7 @@ class MockVRService {
     return runtime;
   }
 
-  removeAllRuntimes() {
+  _removeAllRuntimes() {
     if (this.client_) {
       this.client_.onDeviceChanged();
     }
@@ -142,7 +151,7 @@ class MockVRService {
     this.runtimes_ = [];
   }
 
-  removeRuntime(device) {
+  _removeRuntime(device) {
     const index = this.runtimes_.indexOf(device);
     if (index >= 0) {
       this.runtimes_.splice(index, 1);
@@ -152,6 +161,7 @@ class MockVRService {
     }
   }
 
+  // VRService overrides
   setClient(client) {
     if (this.client_) {
       throw new Error("setClient should only be called once");
@@ -164,7 +174,7 @@ class MockVRService {
     const requests = [];
     // Request a session from all the runtimes.
     for (let i = 0; i < this.runtimes_.length; i++) {
-      requests[i] = this.runtimes_[i].requestRuntimeSession(sessionOptions);
+      requests[i] = this.runtimes_[i]._requestRuntimeSession(sessionOptions);
     }
 
     return Promise.all(requests).then((results) => {
@@ -186,20 +196,16 @@ class MockVRService {
 
       // If there were no successful results, returns a null session.
       return {
-        result: {failureReason: vrMojom.RequestSessionError.NO_RUNTIME_FOUND}
+        result: {failureReason: xrSessionMojom.RequestSessionError.NO_RUNTIME_FOUND}
       };
     });
-  }
-
-  exitPresent() {
-    return Promise.resolve();
   }
 
   supportsSession(sessionOptions) {
     const requests = [];
     // Check supports on all the runtimes.
     for (let i = 0; i < this.runtimes_.length; i++) {
-      requests[i] = this.runtimes_[i].runtimeSupportsSession(sessionOptions);
+      requests[i] = this.runtimes_[i]._runtimeSupportsSession(sessionOptions);
     }
 
     return Promise.all(requests).then((results) => {
@@ -215,11 +221,16 @@ class MockVRService {
     });
   }
 
+  exitPresent() {
+    return Promise.resolve();
+  }
+
   setFramesThrottled(throttled) {
     this.setFramesThrottledImpl(throttled);
   }
 
-  // May be overridden by specific tests.
+  // We cannot override the mojom interceptors via the prototype; so this method
+  // and the above indirection exist to allow overrides by internal code.
   setFramesThrottledImpl(throttled) {}
 
   // Only handles asynchronous calls to makeXrCompatible. Synchronous calls are
@@ -247,6 +258,7 @@ class FakeXRAnchorController {
     this.anchorOrigin_ = XRMathHelper.identity();
   }
 
+  // WebXR Test API (Anchors Extension)
   get deleted() {
     return this.deleted_;
   }
@@ -267,7 +279,7 @@ class FakeXRAnchorController {
 
   stopTracking() {
     if(!this.deleted_) {
-      this.device_.deleteAnchorController(this.id_);
+      this.device_._deleteAnchorController(this.id_);
 
       this.deleted_ = true;
       this.dirty_ = true;
@@ -296,29 +308,12 @@ class FakeXRAnchorController {
     return this.paused_;
   }
 
-  markProcessed() {
+  _markProcessed() {
     this.dirty_ = false;
   }
 
-  getAnchorOrigin() {
+  _getAnchorOrigin() {
     return this.anchorOrigin_;
-  }
-}
-
-// Internal only for now, needs to be moved into WebXR Test API.
-class FakeXRHitTestSourceController {
-  constructor(id) {
-    this.id_ = id;
-    this.deleted_ = false;
-  }
-
-  get deleted() {
-    return this.deleted_;
-  }
-
-  // Internal setter:
-  set deleted(value) {
-    this.deleted_ = value;
   }
 }
 
@@ -327,32 +322,35 @@ class FakeXRHitTestSourceController {
 class MockRuntime {
   // Mapping from string feature names to the corresponding mojo types.
   // This is exposed as a member for extensibility.
-  static featureToMojoMap = {
-    'viewer': vrMojom.XRSessionFeature.REF_SPACE_VIEWER,
-    'local': vrMojom.XRSessionFeature.REF_SPACE_LOCAL,
-    'local-floor': vrMojom.XRSessionFeature.REF_SPACE_LOCAL_FLOOR,
-    'bounded-floor': vrMojom.XRSessionFeature.REF_SPACE_BOUNDED_FLOOR,
-    'unbounded': vrMojom.XRSessionFeature.REF_SPACE_UNBOUNDED,
-    'hit-test': vrMojom.XRSessionFeature.HIT_TEST,
-    'dom-overlay': vrMojom.XRSessionFeature.DOM_OVERLAY,
-    'light-estimation': vrMojom.XRSessionFeature.LIGHT_ESTIMATION,
-    'anchors': vrMojom.XRSessionFeature.ANCHORS,
-    'depth-sensing': vrMojom.XRSessionFeature.DEPTH,
+  static _featureToMojoMap = {
+    'viewer': xrSessionMojom.XRSessionFeature.REF_SPACE_VIEWER,
+    'local': xrSessionMojom.XRSessionFeature.REF_SPACE_LOCAL,
+    'local-floor': xrSessionMojom.XRSessionFeature.REF_SPACE_LOCAL_FLOOR,
+    'bounded-floor': xrSessionMojom.XRSessionFeature.REF_SPACE_BOUNDED_FLOOR,
+    'unbounded': xrSessionMojom.XRSessionFeature.REF_SPACE_UNBOUNDED,
+    'hit-test': xrSessionMojom.XRSessionFeature.HIT_TEST,
+    'dom-overlay': xrSessionMojom.XRSessionFeature.DOM_OVERLAY,
+    'light-estimation': xrSessionMojom.XRSessionFeature.LIGHT_ESTIMATION,
+    'anchors': xrSessionMojom.XRSessionFeature.ANCHORS,
+    'depth-sensing': xrSessionMojom.XRSessionFeature.DEPTH,
+    'secondary-views': xrSessionMojom.XRSessionFeature.SECONDARY_VIEWS,
+    'camera-access': xrSessionMojom.XRSessionFeature.CAMERA_ACCESS,
+    'layers': xrSessionMojom.XRSessionFeature.LAYERS,
   };
 
-  static sessionModeToMojoMap = {
-    "inline": vrMojom.XRSessionMode.kInline,
-    "immersive-vr": vrMojom.XRSessionMode.kImmersiveVr,
-    "immersive-ar": vrMojom.XRSessionMode.kImmersiveAr,
+  static _sessionModeToMojoMap = {
+    "inline": xrSessionMojom.XRSessionMode.kInline,
+    "immersive-vr": xrSessionMojom.XRSessionMode.kImmersiveVr,
+    "immersive-ar": xrSessionMojom.XRSessionMode.kImmersiveAr,
   };
 
-  static environmentBlendModeToMojoMap = {
+  static _environmentBlendModeToMojoMap = {
     "opaque": vrMojom.XREnvironmentBlendMode.kOpaque,
     "alpha-blend": vrMojom.XREnvironmentBlendMode.kAlphaBlend,
     "additive": vrMojom.XREnvironmentBlendMode.kAdditive,
   };
 
-  static interactionModeToMojoMap = {
+  static _interactionModeToMojoMap = {
     "screen-space": vrMojom.XRInteractionMode.kScreenSpace,
     "world-space": vrMojom.XRInteractionMode.kWorldSpace,
   };
@@ -411,16 +409,7 @@ class MockRuntime {
     }
 
     this.supportedModes_ = this._convertModesToEnum(supportedModes);
-
-    // Initialize DisplayInfo first to set the defaults, then override with
-    // anything from the deviceInit
-    if (this.supportedModes_.includes(vrMojom.XRSessionMode.kImmersiveVr) ||
-        this.supportedModes_.includes(vrMojom.XRSessionMode.kImmersiveAr)) {
-      this.displayInfo_ = this.getImmersiveDisplayInfo();
-    } else if (this.supportedModes_.includes(vrMojom.XRSessionMode.kInline)) {
-      this.displayInfo_ = this.getNonImmersiveDisplayInfo();
-    } else {
-      // This should never happen!
+    if (this.supportedModes_.length == 0) {
       console.error("Device has empty supported modes array!");
       throw new InvalidStateError();
     }
@@ -434,7 +423,7 @@ class MockRuntime {
     }
 
     if (fakeDeviceInit.world) {
-      this.world_ = fakeDeviceInit.world;
+      this.setWorld(fakeDeviceInit.world);
     }
 
     if (fakeDeviceInit.depthSensingData) {
@@ -448,74 +437,53 @@ class MockRuntime {
     // This appropriately handles if the coordinates are null
     this.setBoundsGeometry(fakeDeviceInit.boundsCoordinates);
 
-    this.setViews(fakeDeviceInit.views);
+    this.setViews(fakeDeviceInit.views, fakeDeviceInit.secondaryViews);
 
     // Need to support webVR which doesn't have a notion of features
-    this.setFeatures(fakeDeviceInit.supportedFeatures || []);
+    this._setFeatures(fakeDeviceInit.supportedFeatures || []);
   }
 
-  _convertModeToEnum(sessionMode) {
-    if (sessionMode in MockRuntime.sessionModeToMojoMap) {
-      return MockRuntime.sessionModeToMojoMap[sessionMode];
+  // WebXR Test API
+  setViews(primaryViews, secondaryViews) {
+    this.cameraImage_ = null;
+    this.primaryViews_ = [];
+    this.secondaryViews_ = [];
+    let xOffset = 0;
+    if (primaryViews) {
+      this.primaryViews_ = [];
+      xOffset = this._setViews(primaryViews, xOffset, this.primaryViews_);
+      const cameraImage = this._findCameraImage(primaryViews);
+
+      if (cameraImage) {
+        this.cameraImage_ = cameraImage;
+      }
     }
 
-    throw new TypeError("Unrecognized value for XRSessionMode enum: " + sessionMode);
-  }
+    if (secondaryViews) {
+      this.secondaryViews_ = [];
+      this._setViews(secondaryViews, xOffset, this.secondaryViews_);
+      const cameraImage = this._findCameraImage(secondaryViews);
 
-  _convertModesToEnum(sessionModes) {
-    return sessionModes.map(mode => this._convertModeToEnum(mode));
-  }
+      if (cameraImage) {
+        if (!isSameCameraImageInit(this.cameraImage_, cameraImage)) {
+          throw new Error("If present, camera resolutions on each view must match each other!"
+                          + " Secondary views' camera doesn't match primary views.");
+        }
 
-  _convertBlendModeToEnum(blendMode) {
-    if (blendMode in MockRuntime.environmentBlendModeToMojoMap) {
-      return MockRuntime.environmentBlendModeToMojoMap[blendMode];
-    } else {
-      if (this.supportedModes_.includes(vrMojom.XRSessionMode.kImmersiveAr)) {
-        return vrMojom.XREnvironmentBlendMode.kAdditive;
-      } else if (this.supportedModes_.includes(
-            vrMojom.XRSessionMode.kImmersiveVr)) {
-        return vrMojom.XREnvironmentBlendMode.kOpaque;
+        this.cameraImage_ = cameraImage;
       }
     }
   }
 
-  _convertInteractionModeToEnum(interactionMode) {
-    if (interactionMode in MockRuntime.interactionModeToMojoMap) {
-      return MockRuntime.interactionModeToMojoMap[interactionMode];
-    } else {
-      return vrMojom.XRInteractionMode.kWorldSpace;
-    }
-  }
-
-  // Test API methods.
   disconnect() {
-    this.service_.removeRuntime(this);
-    this.presentation_provider_.Close();
+    this.service_._removeRuntime(this);
+    this.presentation_provider_._close();
     if (this.sessionClient_) {
       this.sessionClient_.$.close();
       this.sessionClient_ = null;
     }
 
     return Promise.resolve();
-  }
-
-  setViews(views) {
-    if (views) {
-      let changed = false;
-      for (let i = 0; i < views.length; i++) {
-        if (views[i].eye == 'left') {
-          this.displayInfo_.leftEye = this.getEye(views[i]);
-          changed = true;
-        } else if (views[i].eye == 'right') {
-          this.displayInfo_.rightEye = this.getEye(views[i]);
-          changed = true;
-        }
-      }
-
-      if (changed && this.sessionClient_) {
-        this.sessionClient_.onChanged(this.displayInfo_);
-      }
-    }
   }
 
   setViewerOrigin(origin, emulatedPosition = false) {
@@ -538,21 +506,23 @@ class MockRuntime {
     this.pose_ = null;
   }
 
-  simulateVisibilityChange(visibilityState) {
-    let mojoState = null;
-    switch (visibilityState) {
-      case "visible":
-        mojoState = vrMojom.XRVisibilityState.VISIBLE;
-        break;
-      case "visible-blurred":
-        mojoState = vrMojom.XRVisibilityState.VISIBLE_BLURRED;
-        break;
-      case "hidden":
-        mojoState = vrMojom.XRVisibilityState.HIDDEN;
-        break;
+  setFloorOrigin(floorOrigin) {
+    if (!this.stageParameters_) {
+      this.stageParameters_ = default_stage_parameters;
+      this.stageParameters_.bounds = this.bounds_;
     }
-    if (mojoState && this.sessionClient_) {
-      this.sessionClient_.onVisibilityStateChanged(mojoState);
+
+    // floorOrigin is passed in as mojoFromFloor.
+    this.stageParameters_.mojoFromFloor =
+        {matrix: getMatrixFromTransform(floorOrigin)};
+
+    this._onStageParametersUpdated();
+  }
+
+  clearFloorOrigin() {
+    if (this.stageParameters_) {
+      this.stageParameters_ = null;
+      this._onStageParametersUpdated();
     }
   }
 
@@ -571,37 +541,30 @@ class MockRuntime {
     // floorLevel transform is set, but we won't update them just yet.
     if (this.stageParameters_) {
       this.stageParameters_.bounds = this.bounds_;
-      this.onStageParametersUpdated();
+      this._onStageParametersUpdated();
     }
-  }
-
-  setFloorOrigin(floorOrigin) {
-    if (!this.stageParameters_) {
-      this.stageParameters_ = default_stage_parameters;
-      this.stageParameters_.bounds = this.bounds_;
-    }
-
-    // floorOrigin is passed in as mojoFromFloor.
-    this.stageParameters_.mojoFromFloor =
-        {matrix: getMatrixFromTransform(floorOrigin)};
-
-    this.onStageParametersUpdated();
-  }
-
-  clearFloorOrigin() {
-    if (this.stageParameters_) {
-      this.stageParameters_ = null;
-      this.onStageParametersUpdated();
-    }
-  }
-
-  onStageParametersUpdated() {
-    // Indicate for the frame loop that the stage parameters have been updated.
-    this.stageParametersId_++;
   }
 
   simulateResetPose() {
     this.send_mojo_space_reset_ = true;
+  }
+
+  simulateVisibilityChange(visibilityState) {
+    let mojoState = null;
+    switch (visibilityState) {
+      case "visible":
+        mojoState = vrMojom.XRVisibilityState.VISIBLE;
+        break;
+      case "visible-blurred":
+        mojoState = vrMojom.XRVisibilityState.VISIBLE_BLURRED;
+        break;
+      case "hidden":
+        mojoState = vrMojom.XRVisibilityState.HIDDEN;
+        break;
+    }
+    if (mojoState && this.sessionClient_) {
+      this.sessionClient_.onVisibilityStateChanged(mojoState);
+    }
   }
 
   simulateInputSourceConnection(fakeInputSourceInit) {
@@ -613,6 +576,16 @@ class MockRuntime {
     return source;
   }
 
+  // WebXR Test API Hit Test extensions
+  setWorld(world) {
+    this.world_ = world;
+  }
+
+  clearWorld() {
+    this.world_ = null;
+  }
+
+  // WebXR Test API Anchor extensions
   setAnchorCreationCallback(callback) {
     this.anchor_creation_callback_ = callback;
   }
@@ -621,6 +594,7 @@ class MockRuntime {
     this.hit_test_source_creation_callback_ = callback;
   }
 
+  // WebXR Test API Lighting estimation extensions
   setLightEstimate(fakeXrLightEstimateInit) {
     if (!fakeXrLightEstimateInit.sphericalHarmonicsCoefficients) {
       throw new TypeError("sphericalHarmonicsCoefficients must be set");
@@ -683,6 +657,7 @@ class MockRuntime {
     }
   }
 
+  // WebXR Test API depth Sensing Extensions
   setDepthSensingData(depthSensingData) {
     for(const key of ["depthData", "normDepthBufferFromNormView", "rawValueToMeters", "width", "height"]) {
       if(!(key in depthSensingData)) {
@@ -709,62 +684,110 @@ class MockRuntime {
     this.depthSensingDataDirty_ = true;
   }
 
-  // Helper methods
-  getNonImmersiveDisplayInfo() {
-    const displayInfo = this.getImmersiveDisplayInfo();
+  // Internal Implementation/Helper Methods
+  _convertModeToEnum(sessionMode) {
+    if (sessionMode in MockRuntime._sessionModeToMojoMap) {
+      return MockRuntime._sessionModeToMojoMap[sessionMode];
+    }
 
-    displayInfo.capabilities.canPresent = false;
-    displayInfo.leftEye = null;
-    displayInfo.rightEye = null;
-
-    return displayInfo;
+    throw new TypeError("Unrecognized value for XRSessionMode enum: " + sessionMode);
   }
 
-  // Function to generate some valid display information for the device.
-  getImmersiveDisplayInfo() {
-    return {
-      displayName: 'FakeDevice',
-      capabilities: {
-        hasPosition: false,
-        hasExternalDisplay: false,
-        canPresent: true,
-        maxLayers: 1
-      },
-      stageParameters: null,
-      leftEye: {
+  _convertModesToEnum(sessionModes) {
+    return sessionModes.map(mode => this._convertModeToEnum(mode));
+  }
+
+  _convertBlendModeToEnum(blendMode) {
+    if (blendMode in MockRuntime._environmentBlendModeToMojoMap) {
+      return MockRuntime._environmentBlendModeToMojoMap[blendMode];
+    } else {
+      if (this.supportedModes_.includes(xrSessionMojom.XRSessionMode.kImmersiveAr)) {
+        return vrMojom.XREnvironmentBlendMode.kAdditive;
+      } else if (this.supportedModes_.includes(
+        xrSessionMojom.XRSessionMode.kImmersiveVr)) {
+        return vrMojom.XREnvironmentBlendMode.kOpaque;
+      }
+    }
+  }
+
+  _convertInteractionModeToEnum(interactionMode) {
+    if (interactionMode in MockRuntime._interactionModeToMojoMap) {
+      return MockRuntime._interactionModeToMojoMap[interactionMode];
+    } else {
+      return vrMojom.XRInteractionMode.kWorldSpace;
+    }
+  }
+
+  _setViews(deviceViews, xOffset, views) {
+    for (let i = 0; i < deviceViews.length; i++) {
+      views[i] = this._getView(deviceViews[i], xOffset);
+      xOffset += deviceViews[i].resolution.width;
+    }
+
+    return xOffset;
+  }
+
+  _findCameraImage(views) {
+    const viewWithCamera = views.find(view => view.cameraImageInit);
+    if (viewWithCamera) {
+      //If we have one view with a camera resolution, all views should have the same camera resolution.
+      const allViewsHaveSameCamera = views.every(
+        view => isSameCameraImageInit(view.cameraImageInit, viewWithCamera.cameraImageInit));
+
+      if (!allViewsHaveSameCamera) {
+        throw new Error("If present, camera resolutions on each view must match each other!");
+      }
+
+      return viewWithCamera.cameraImageInit;
+    }
+
+    return null;
+  }
+
+  _onStageParametersUpdated() {
+    // Indicate for the frame loop that the stage parameters have been updated.
+    this.stageParametersId_++;
+  }
+
+  _getDefaultViews() {
+    if (this.primaryViews_) {
+      return this.primaryViews_;
+    }
+
+    const viewport_size = 20;
+    return [{
+        eye: vrMojom.XREye.kLeft,
         fieldOfView: {
           upDegrees: 48.316,
           downDegrees: 50.099,
           leftDegrees: 50.899,
           rightDegrees: 35.197
         },
-        headFromEye: composeGFXTransform({
+        mojoFromView: this._getMojoFromViewerWithOffset(composeGFXTransform({
           position: [-0.032, 0, 0],
           orientation: [0, 0, 0, 1]
-        }),
-        renderWidth: 20,
-        renderHeight: 20
+        })),
+        viewport: { x: 0, y: 0, width: viewport_size, height: viewport_size }
       },
-      rightEye: {
+      {
+        eye: vrMojom.XREye.kRight,
         fieldOfView: {
           upDegrees: 48.316,
           downDegrees: 50.099,
           leftDegrees: 50.899,
           rightDegrees: 35.197
         },
-        headFromEye: composeGFXTransform({
+        mojoFromView: this._getMojoFromViewerWithOffset(composeGFXTransform({
           position: [0.032, 0, 0],
           orientation: [0, 0, 0, 1]
-        }),
-        renderWidth: 20,
-        renderHeight: 20
-      }
-    };
+        })),
+        viewport: { x: viewport_size, y: 0, width: viewport_size, height: viewport_size }
+      }];
   }
 
   // This function converts between the matrix provided by the WebXR test API
   // and the internal data representation.
-  getEye(fakeXRViewInit) {
+  _getView(fakeXRViewInit, xOffset) {
     let fov = null;
 
     if (fakeXRViewInit.fieldOfView) {
@@ -794,20 +817,43 @@ class MockRuntime {
       };
     }
 
+    let viewEye = vrMojom.XREye.kNone;
+    // The eye passed in corresponds to the values in the WebXR spec, which are
+    // the strings "none", "left", and "right". They should be converted to the
+    // corresponding values of XREye in vr_service.mojom.
+    switch(fakeXRViewInit.eye) {
+      case "none":
+        viewEye = vrMojom.XREye.kNone;
+        break;
+      case "left":
+        viewEye = vrMojom.XREye.kLeft;
+        break;
+      case "right":
+        viewEye = vrMojom.XREye.kRight;
+        break;
+    }
+
     return {
+      eye: viewEye,
       fieldOfView: fov,
-      headFromEye: composeGFXTransform(fakeXRViewInit.viewOffset),
-      renderWidth: fakeXRViewInit.resolution.width,
-      renderHeight: fakeXRViewInit.resolution.height
+      mojoFromView: this._getMojoFromViewerWithOffset(composeGFXTransform(fakeXRViewInit.viewOffset)),
+      viewport: {
+        x: xOffset,
+        y: 0,
+        width: fakeXRViewInit.resolution.width,
+        height: fakeXRViewInit.resolution.height
+      },
+      isFirstPersonObserver: fakeXRViewInit.isFirstPersonObserver ? true : false,
+      viewOffset: composeGFXTransform(fakeXRViewInit.viewOffset)
     };
   }
 
-  setFeatures(supportedFeatures) {
+  _setFeatures(supportedFeatures) {
     function convertFeatureToMojom(feature) {
-      if (feature in MockRuntime.featureToMojoMap) {
-        return MockRuntime.featureToMojoMap[feature];
+      if (feature in MockRuntime._featureToMojoMap) {
+        return MockRuntime._featureToMojoMap[feature];
       } else {
-        return vrMojom.XRSessionFeature.INVALID;
+        return xrSessionMojom.XRSessionFeature.INVALID;
       }
     }
 
@@ -815,30 +861,29 @@ class MockRuntime {
 
     for (let i = 0; i < supportedFeatures.length; i++) {
       const feature = convertFeatureToMojom(supportedFeatures[i]);
-      if (feature !== vrMojom.XRSessionFeature.INVALID) {
+      if (feature !== xrSessionMojom.XRSessionFeature.INVALID) {
         this.supportedFeatures_.push(feature);
       }
     }
   }
 
   // These methods are intended to be used by MockXRInputSource only.
-  addInputSource(source) {
+  _addInputSource(source) {
     if (!this.input_sources_.has(source.source_id_)) {
       this.input_sources_.set(source.source_id_, source);
     }
   }
 
-  removeInputSource(source) {
+  _removeInputSource(source) {
     this.input_sources_.delete(source.source_id_);
   }
 
   // These methods are intended to be used by FakeXRAnchorController only.
-  deleteAnchorController(controllerId) {
+  _deleteAnchorController(controllerId) {
     this.anchor_controllers_.delete(controllerId);
   }
 
   // Extension point for non-standard modules.
-
   _injectAdditionalFrameData(options, frameData) {
   }
 
@@ -864,12 +909,27 @@ class MockRuntime {
         if (this.input_sources_.size > 0) {
           input_state = [];
           for (const input_source of this.input_sources_.values()) {
-            input_state.push(input_source.getInputSourceState());
+            input_state.push(input_source._getInputSourceState());
           }
         }
 
+        let frame_views = this.primaryViews_;
+        for (let i = 0; i < this.primaryViews_.length; i++) {
+          this.primaryViews_[i].mojoFromView =
+            this._getMojoFromViewerWithOffset(this.primaryViews_[i].viewOffset);
+        }
+        if (this.enabledFeatures_.includes(xrSessionMojom.XRSessionFeature.SECONDARY_VIEWS)) {
+          for (let i = 0; i < this.secondaryViews_.length; i++) {
+            this.secondaryViews_[i].mojoFromView =
+              this._getMojoFromViewerWithOffset(this.secondaryViews_[i].viewOffset);
+          }
+
+          frame_views = frame_views.concat(this.secondaryViews_);
+        }
+
         const frameData = {
-          pose: this.pose_,
+          mojoFromViewer: this.pose_,
+          views: frame_views,
           mojoSpaceReset: mojo_space_reset,
           inputState: input_state,
           timeDelta: {
@@ -878,7 +938,10 @@ class MockRuntime {
           },
           frameId: this.next_frame_id_,
           bufferHolder: null,
-          bufferSize: {},
+          cameraImageSize: this.cameraImage_ ? {
+            width: this.cameraImage_.width,
+            height: this.cameraImage_.height
+          } : null,
           renderingTimeRatio: 0,
           stageParameters: this.stageParameters_,
           stageParametersId: this.stageParametersId_,
@@ -898,7 +961,7 @@ class MockRuntime {
         resolve({frameData});
       };
 
-      if(this.sessionOptions_.mode == vrMojom.XRSessionMode.kInline) {
+      if(this.sessionOptions_.mode == xrSessionMojom.XRSessionMode.kInline) {
         // Inline sessions should not have a delay introduced since it causes them
         // to miss a vsync blink-side and delays propagation of changes that happened
         // within a rAFcb by one frame (e.g. setViewerOrigin() calls would take 2 frames
@@ -922,26 +985,9 @@ class MockRuntime {
         environmentProviderRequest.handle);
   }
 
-  setInputSourceButtonListener(listener) { listener.$.close(); }
-
-  // Note that if getEnvironmentProvider hasn't finished running yet this will
-  // be undefined. It's recommended that you allow a successful task to post
-  // first before attempting to close.
-  closeEnvironmentIntegrationProvider() {
-    if (this.environmentProviderReceiver_) {
-      this.environmentProviderReceiver_.$.close();
-    }
-  }
-
-  closeDataProvider() {
-    this.closeEnvironmentIntegrationProvider();
-    this.dataProviderReceiver_.$.close();
-    this.sessionOptions_ = null;
-  }
-
   // XREnvironmentIntegrationProvider implementation:
   subscribeToHitTest(nativeOriginInformation, entityTypes, ray) {
-    if (!this.supportedModes_.includes(vrMojom.XRSessionMode.kImmersiveAr)) {
+    if (!this.supportedModes_.includes(xrSessionMojom.XRSessionMode.kImmersiveAr)) {
       // Reject outside of AR.
       return Promise.resolve({
         result : vrMojom.SubscribeToHitTestResult.FAILURE_GENERIC,
@@ -982,7 +1028,7 @@ class MockRuntime {
   }
 
   subscribeToHitTestForTransientInput(profileName, entityTypes, ray){
-    if (!this.supportedModes_.includes(vrMojom.XRSessionMode.kImmersiveAr)) {
+    if (!this.supportedModes_.includes(xrSessionMojom.XRSessionMode.kImmersiveAr)) {
       // Reject outside of AR.
       return Promise.resolve({
         result : vrMojom.SubscribeToHitTestResult.FAILURE_GENERIC,
@@ -1111,8 +1157,8 @@ class MockRuntime {
   detachAnchor(anchorId) {}
 
   // Utility function
-  requestRuntimeSession(sessionOptions) {
-    return this.runtimeSupportsSession(sessionOptions).then((result) => {
+  _requestRuntimeSession(sessionOptions) {
+    return this._runtimeSupportsSession(sessionOptions).then((result) => {
       // The JavaScript bindings convert c_style_names to camelCase names.
       const options = {
         transportMethod:
@@ -1125,8 +1171,8 @@ class MockRuntime {
       let submit_frame_sink;
       if (result.supportsSession) {
         submit_frame_sink = {
-          clientReceiver: this.presentation_provider_.getClientReceiver(),
-          provider: this.presentation_provider_.bindProvider(sessionOptions),
+          clientReceiver: this.presentation_provider_._getClientReceiver(),
+          provider: this.presentation_provider_._bindProvider(sessionOptions),
           transportOptions: options
         };
 
@@ -1142,16 +1188,18 @@ class MockRuntime {
 
         const enabled_features = [];
         for (let i = 0; i < sessionOptions.requiredFeatures.length; i++) {
-          if (this.supportedFeatures_.indexOf(sessionOptions.requiredFeatures[i]) !== -1) {
-            enabled_features.push(sessionOptions.requiredFeatures[i]);
+          const feature = sessionOptions.requiredFeatures[i];
+          if (this._runtimeSupportsFeature(feature, sessionOptions)) {
+            enabled_features.push(feature);
           } else {
             return Promise.resolve({session: null});
           }
         }
 
         for (let i =0; i < sessionOptions.optionalFeatures.length; i++) {
-          if (this.supportedFeatures_.indexOf(sessionOptions.optionalFeatures[i]) !== -1) {
-            enabled_features.push(sessionOptions.optionalFeatures[i]);
+          const feature = sessionOptions.optionalFeatures[i];
+          if (this._runtimeSupportsFeature(feature, sessionOptions)) {
+            enabled_features.push(feature);
           }
         }
 
@@ -1162,17 +1210,19 @@ class MockRuntime {
             submitFrameSink: submit_frame_sink,
             dataProvider: dataProviderPtr,
             clientReceiver: clientReceiver,
-            displayInfo: this.displayInfo_,
             enabledFeatures: enabled_features,
             deviceConfig: {
-              usesInputEventing: false,
               defaultFramebufferScale: this.defaultFramebufferScale_,
               supportsViewportScaling: true,
-              depthConfiguration:
-                enabled_features.includes(vrMojom.XRSessionFeature.DEPTH) ? {
-                  depthUsage: vrMojom.XRDepthUsage.kCPUOptimized,
-                  depthDataFormat: vrMojom.XRDepthDataFormat.kLuminanceAlpha,
-                } : null,
+              depthConfiguration: enabled_features.includes(
+                                      xrSessionMojom.XRSessionFeature.DEPTH) ?
+                  {
+                    depthUsage: xrSessionMojom.XRDepthUsage.kCPUOptimized,
+                    depthDataFormat:
+                        xrSessionMojom.XRDepthDataFormat.kLuminanceAlpha,
+                  } :
+                  null,
+              views: this._getDefaultViews(),
             },
             enviromentBlendMode: this.enviromentBlendMode_,
             interactionMode: this.interactionMode_
@@ -1184,25 +1234,38 @@ class MockRuntime {
     });
   }
 
-  runtimeSupportsSession(options) {
+  _runtimeSupportsSession(options) {
     let result = this.supportedModes_.includes(options.mode);
-
-    if (options.requiredFeatures.includes(vrMojom.XRSessionFeature.DEPTH)
-    || options.optionalFeatures.includes(vrMojom.XRSessionFeature.DEPTH)) {
-      result &= options.depthOptions.usagePreferences.includes(vrMojom.XRDepthUsage.kCPUOptimized);
-      result &= options.depthOptions.dataFormatPreferences.includes(vrMojom.XRDepthDataFormat.kLuminanceAlpha);
-    }
-
     return Promise.resolve({
       supportsSession: result,
     });
   }
 
+  _runtimeSupportsFeature(feature, options) {
+    if (this.supportedFeatures_.indexOf(feature) === -1) {
+      return false;
+    }
+
+    switch (feature) {
+      case xrSessionMojom.XRSessionFeature.DEPTH:
+        // This matches what Chrome can currently support.
+        return options.depthOptions &&
+               (options.depthOptions.usagePreferences.length == 0 ||
+                options.depthOptions.usagePreferences.includes(
+                  xrSessionMojom.XRDepthUsage.kCPUOptimized)) &&
+               (options.depthOptions.dataFormatPreferences.length == 0 ||
+                options.depthOptions.dataFormatPreferences.includes(
+                 xrSessionMojom.XRDepthDataFormat.kLuminanceAlpha));
+      default:
+        return true;
+    }
+  }
+
   // Private functions - utilities:
   _nativeOriginKnown(nativeOriginInformation){
 
-    if (nativeOriginInformation.inputSourceId !== undefined) {
-      if (!this.input_sources_.has(nativeOriginInformation.inputSourceId)) {
+    if (nativeOriginInformation.inputSourceSpaceInfo !== undefined) {
+      if (!this.input_sources_.has(nativeOriginInformation.inputSourceSpaceInfo.inputSourceId)) {
         // Unknown input source.
         return false;
       }
@@ -1226,7 +1289,7 @@ class MockRuntime {
 
   // Modifies passed in frameData to add anchor information.
   _calculateAnchorInformation(frameData) {
-    if (!this.supportedModes_.includes(vrMojom.XRSessionMode.kImmersiveAr)) {
+    if (!this.supportedModes_.includes(xrSessionMojom.XRSessionMode.kImmersiveAr)) {
       return;
     }
 
@@ -1240,10 +1303,10 @@ class MockRuntime {
         if(!controller.paused) {
           anchorData.mojoFromAnchor = getPoseFromTransform(
               XRMathHelper.decomposeRigidTransform(
-                  controller.getAnchorOrigin()));
+                  controller._getAnchorOrigin()));
         }
 
-        controller.markProcessed();
+        controller._markProcessed();
 
         frameData.anchorsData.updatedAnchorsData.push(anchorData);
       }
@@ -1254,35 +1317,42 @@ class MockRuntime {
 
   // Modifies passed in frameData to add anchor information.
   _calculateDepthInformation(frameData) {
-    if (!this.supportedModes_.includes(vrMojom.XRSessionMode.kImmersiveAr)) {
+    if (!this.supportedModes_.includes(xrSessionMojom.XRSessionMode.kImmersiveAr)) {
       return;
     }
 
-    if (!this.enabledFeatures_.includes(vrMojom.XRSessionFeature.DEPTH)) {
+    if (!this.enabledFeatures_.includes(xrSessionMojom.XRSessionFeature.DEPTH)) {
       return;
     }
+
+    let newDepthData;
 
     // If we don't have a current depth data, we'll return null
     // (i.e. no data is not a valid data, so it cannot be "StillValid").
     if (this.depthSensingData_ == null) {
-      frameData.depthData = null;
-      return;
+      newDepthData = null;
+    } else if(!this.depthSensingDataDirty_) {
+      newDepthData = { dataStillValid: {}};
+    } else {
+      newDepthData = {
+        updatedDepthData: {
+          timeDelta: frameData.timeDelta,
+          normTextureFromNormView: this.depthSensingData_.normDepthBufferFromNormView,
+          rawValueToMeters: this.depthSensingData_.rawValueToMeters,
+          size: { width: this.depthSensingData_.width, height: this.depthSensingData_.height },
+          pixelData: { bytes: this.depthSensingData_.depthData }
+        }
+      };
     }
 
-    if(!this.depthSensingDataDirty_) {
-      frameData.depthData = { dataStillValid: {}};
-      return;
+    for (let i = 0; i < this.primaryViews_.length; i++) {
+      this.primaryViews_[i].depthData = newDepthData;
     }
-
-    frameData.depthData = {
-      updatedDepthData: {
-        timeDelta: frameData.timeDelta,
-        normTextureFromNormView: this.depthSensingData_.normDepthBufferFromNormView,
-        rawValueToMeters: this.depthSensingData_.rawValueToMeters,
-        size: { width: this.depthSensingData_.width, height: this.depthSensingData_.height },
-        pixelData: { bytes: this.depthSensingData_.depthData }
+    if (this.enabledFeatures_.includes(xrSessionMojom.XRSessionFeature.SECONDARY_VIEWS)) {
+      for (let i = 0; i < this.secondaryViews_.length; i++) {
+        this.secondaryViews_[i].depthData = newDepthData;
       }
-    };
+    }
 
     this.depthSensingDataDirty_ = false;
   }
@@ -1302,7 +1372,7 @@ class MockRuntime {
 
   // Modifies passed in frameData to add hit test results.
   _calculateHitTestResults(frameData) {
-    if (!this.supportedModes_.includes(vrMojom.XRSessionMode.kImmersiveAr)) {
+    if (!this.supportedModes_.includes(xrSessionMojom.XRSessionMode.kImmersiveAr)) {
       return;
     }
 
@@ -1533,6 +1603,9 @@ class MockRuntime {
   }
 
   _getMojoFromViewer() {
+    if (!this.pose_) {
+      return XRMathHelper.identity();
+    }
     const transform = {
       position: [
         this.pose_.position.x,
@@ -1548,14 +1621,18 @@ class MockRuntime {
     return getMatrixFromTransform(transform);
   }
 
+  _getMojoFromViewerWithOffset(viewOffset) {
+    return { matrix: XRMathHelper.mul4x4(this._getMojoFromViewer(), viewOffset.matrix) };
+  }
+
   _getMojoFromNativeOrigin(nativeOriginInformation) {
     const mojo_from_viewer = this._getMojoFromViewer();
 
-    if (nativeOriginInformation.inputSourceId !== undefined) {
-      if (!this.input_sources_.has(nativeOriginInformation.inputSourceId)) {
+    if (nativeOriginInformation.inputSourceSpaceInfo !== undefined) {
+      if (!this.input_sources_.has(nativeOriginInformation.inputSourceSpaceInfo.inputSourceId)) {
         return null;
       } else {
-        const inputSource = this.input_sources_.get(nativeOriginInformation.inputSourceId);
+        const inputSource = this.input_sources_.get(nativeOriginInformation.inputSourceSpaceInfo.inputSourceId);
         return inputSource._getMojoFromInputSource(mojo_from_viewer);
       }
     } else if (nativeOriginInformation.referenceSpaceType !== undefined) {
@@ -1623,7 +1700,7 @@ class MockXRInputSource {
     this.desc_dirty_ = true;
   }
 
-  // Webxr-test-api
+  // WebXR Test API
   setHandedness(handedness) {
     if (this.handedness_ != handedness) {
       this.desc_dirty_ = true;
@@ -1672,11 +1749,11 @@ class MockXRInputSource {
   }
 
   disconnect() {
-    this.pairedDevice_.removeInputSource(this);
+    this.pairedDevice_._removeInputSource(this);
   }
 
   reconnect() {
-    this.pairedDevice_.addInputSource(this);
+    this.pairedDevice_._addInputSource(this);
   }
 
   startSelection() {
@@ -1715,7 +1792,7 @@ class MockXRInputSource {
     }
 
     const supported_button_map = {};
-    this.gamepad_ = this.getEmptyGamepad();
+    this.gamepad_ = this._getEmptyGamepad();
     for (let i = 0; i < supportedButtons.length; i++) {
       const buttonType = supportedButtons[i].buttonType;
       this.supported_buttons_.push(buttonType);
@@ -1731,11 +1808,11 @@ class MockXRInputSource {
     });
 
     // Now add the rest of our buttons
-    this.addGamepadButton(supported_button_map['grip']);
-    this.addGamepadButton(supported_button_map['touchpad']);
-    this.addGamepadButton(supported_button_map['thumbstick']);
-    this.addGamepadButton(supported_button_map['optional-button']);
-    this.addGamepadButton(supported_button_map['optional-thumbstick']);
+    this._addGamepadButton(supported_button_map['grip']);
+    this._addGamepadButton(supported_button_map['touchpad']);
+    this._addGamepadButton(supported_button_map['thumbstick']);
+    this._addGamepadButton(supported_button_map['optional-button']);
+    this._addGamepadButton(supported_button_map['optional-thumbstick']);
 
     // Finally, back-fill placeholder buttons/axes
     for (let i = 0; i < this.gamepad_.buttons.length; i++) {
@@ -1760,15 +1837,15 @@ class MockXRInputSource {
       throw new Error("Tried to update state on an unsupported button");
     }
 
-    const buttonIndex = this.getButtonIndex(buttonState.buttonType);
-    const axesStartIndex = this.getAxesStartIndex(buttonState.buttonType);
+    const buttonIndex = this._getButtonIndex(buttonState.buttonType);
+    const axesStartIndex = this._getAxesStartIndex(buttonState.buttonType);
 
     if (buttonIndex == -1) {
       throw new Error("Unknown Button Type!");
     }
 
     // is this a 'squeeze' button?
-    if (buttonIndex === this.getButtonIndex('grip')) {
+    if (buttonIndex === this._getButtonIndex('grip')) {
       // squeeze
       if (buttonState.pressed) {
         this.primary_squeeze_pressed_ = true;
@@ -1791,8 +1868,13 @@ class MockXRInputSource {
     }
   }
 
+  // DOM Overlay Extensions
+  setOverlayPointerPosition(x, y) {
+    this.overlay_pointer_position_ = {x: x, y: y};
+  }
+
   // Helpers for Mojom
-  getInputSourceState() {
+  _getInputSourceState() {
     const input_state = {};
 
     input_state.sourceId = this.source_id_;
@@ -1897,11 +1979,7 @@ class MockXRInputSource {
     return input_state;
   }
 
-  setOverlayPointerPosition(x, y) {
-    this.overlay_pointer_position_ = {x: x, y: y};
-  }
-
-  getEmptyGamepad() {
+  _getEmptyGamepad() {
     // Mojo complains if some of the properties on Gamepad are null, so set
     // everything to reasonable defaults that tests can override.
     const gamepad = {
@@ -1910,6 +1988,7 @@ class MockXRInputSource {
       timestamp: 0n,
       axes: [],
       buttons: [],
+      touchEvents: [],
       mapping: GamepadMapping.GamepadMappingStandard,
       displayId: 0,
     };
@@ -1929,13 +2008,13 @@ class MockXRInputSource {
     return gamepad;
   }
 
-  addGamepadButton(buttonState) {
+  _addGamepadButton(buttonState) {
     if (buttonState == null) {
       return;
     }
 
-    const buttonIndex = this.getButtonIndex(buttonState.buttonType);
-    const axesStartIndex = this.getAxesStartIndex(buttonState.buttonType);
+    const buttonIndex = this._getButtonIndex(buttonState.buttonType);
+    const axesStartIndex = this._getAxesStartIndex(buttonState.buttonType);
 
     if (buttonIndex == -1) {
       throw new Error("Unknown Button Type!");
@@ -1955,7 +2034,7 @@ class MockXRInputSource {
   }
 
   // General Helper methods
-  getButtonIndex(buttonType) {
+  _getButtonIndex(buttonType) {
     switch (buttonType) {
       case 'grip':
         return 1;
@@ -1972,7 +2051,7 @@ class MockXRInputSource {
     }
   }
 
-  getAxesStartIndex(buttonType) {
+  _getAxesStartIndex(buttonType) {
     switch (buttonType) {
       case 'touchpad':
         return 0;
@@ -1991,6 +2070,22 @@ class MockXRInputSource {
 }
 
 // Mojo helper classes
+class FakeXRHitTestSourceController {
+  constructor(id) {
+    this.id_ = id;
+    this.deleted_ = false;
+  }
+
+  get deleted() {
+    return this.deleted_;
+  }
+
+  // Internal setter:
+  set deleted(value) {
+    this.deleted_ = value;
+  }
+}
+
 class MockXRPresentationProvider {
   constructor() {
     this.receiver_ = null;
@@ -1998,7 +2093,7 @@ class MockXRPresentationProvider {
     this.missing_frame_count_ = 0;
   }
 
-  bindProvider() {
+  _bindProvider() {
     const provider = new vrMojom.XRPresentationProviderRemote();
 
     if (this.receiver_) {
@@ -2009,14 +2104,14 @@ class MockXRPresentationProvider {
     return provider;
   }
 
-  getClientReceiver() {
+  _getClientReceiver() {
     this.submitFrameClient_ = new vrMojom.XRPresentationClientRemote();
     return this.submitFrameClient_.$.bindNewPipeAndPassReceiver();
   }
 
+  // XRPresentationProvider mojo implementation
   updateLayerBounds(frameId, leftBounds, rightBounds, sourceSize) {}
 
-  // XRPresentationProvider mojo implementation
   submitFrameMissing(frameId, mailboxHolder, timeWaited) {
     this.missing_frame_count_++;
   }
@@ -2033,12 +2128,12 @@ class MockXRPresentationProvider {
     this.submitFrameClient_.onSubmitFrameRendered();
   }
 
-  submitFrameWithTextureHandle(frameId, texture) {}
+  submitFrameWithTextureHandle(frameId, texture, syncToken) {}
 
   submitFrameDrawnIntoTexture(frameId, syncToken, timeWaited) {}
 
   // Utility methods
-  Close() {
+  _close() {
     if (this.receiver_) {
       this.receiver_.$.close();
     }

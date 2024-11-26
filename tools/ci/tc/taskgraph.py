@@ -1,3 +1,5 @@
+# mypy: allow-untyped-defs
+
 import json
 import os
 import re
@@ -65,6 +67,10 @@ def resolve_chunks(task_data):
         return [task_data]
     rv = []
     total_chunks = task_data["chunks"]
+    if "chunks-override" in task_data:
+        override = task_data["chunks-override"].get(task_data["vars"]["test-type"])
+        if override is not None:
+            total_chunks = override
     for i in range(1, total_chunks + 1):
         chunk_data = deepcopy(task_data)
         chunk_data["chunks"] = {"id": i,
@@ -115,7 +121,7 @@ def expand_maps(task):
         return [task]
 
     map_data = task["$map"]
-    if set(map_data.keys()) != set(["for", "do"]):
+    if set(map_data.keys()) != {"for", "do"}:
         raise ValueError("$map objects must have exactly two properties named 'for' "
                          "and 'do' (got %s)" % ("no properties" if not map_data.keys()
                                                 else ", ". join(map_data.keys())))

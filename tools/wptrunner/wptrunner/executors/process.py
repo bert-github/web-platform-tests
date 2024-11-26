@@ -1,3 +1,5 @@
+# mypy: allow-untyped-defs
+
 from .base import TestExecutor
 
 
@@ -8,7 +10,7 @@ class ProcessTestExecutor(TestExecutor):
         self.interactive = (False if self.debug_info is None
                             else self.debug_info.interactive)
 
-    def setup(self, runner):
+    def setup(self, runner, protocol=None):
         self.runner = runner
         self.runner.send_message("init_succeeded")
         return True

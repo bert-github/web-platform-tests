@@ -1,4 +1,7 @@
-import mock
+# mypy: allow-untyped-defs
+
+from unittest import mock
+
 from tools.wpt import revlist
 
 

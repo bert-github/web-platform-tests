@@ -129,21 +129,23 @@ class FakeCentral {
     this.peripherals_ = new Map();
   }
 
-  // Simulates a peripheral with |address|, |name| and |known_service_uuids|
-  // that has already been connected to the system. If the peripheral existed
-  // already it updates its name and known UUIDs. |known_service_uuids| should
-  // be an array of BluetoothServiceUUIDs
+  // Simulates a peripheral with |address|, |name|, |manufacturerData| and
+  // |known_service_uuids| that has already been connected to the system. If the
+  // peripheral existed already it updates its name, manufacturer data, and
+  // known UUIDs. |known_service_uuids| should be an array of
+  // BluetoothServiceUUIDs
   // https://webbluetoothcg.github.io/web-bluetooth/#typedefdef-bluetoothserviceuuid
   //
   // Platforms offer methods to retrieve devices that have already been
   // connected to the system or weren't connected through the UA e.g. a user
   // connected a peripheral through the system's settings. This method is
   // intended to simulate peripherals that those methods would return.
-  async simulatePreconnectedPeripheral({
-    address, name, knownServiceUUIDs = []}) {
-
+  async simulatePreconnectedPeripheral(
+      {address, name, manufacturerData = {}, knownServiceUUIDs = []}) {
     await this.fake_central_ptr_.simulatePreconnectedPeripheral(
-      address, name, canonicalizeAndConvertToMojoUUID(knownServiceUUIDs));
+        address, name,
+        convertToMojoMap(manufacturerData, Number, true /* isNumberKey */),
+        canonicalizeAndConvertToMojoUUID(knownServiceUUIDs));
 
     return this.fetchOrCreatePeripheral_(address);
   }
@@ -601,7 +603,7 @@ async function initializeChromiumResources() {
   content.mojom = await import(
       '/gen/content/web_test/common/fake_bluetooth_chooser.mojom.m.js');
   bluetooth.mojom = await import(
-      '/gen/device/bluetooth/public/mojom/test/fake_bluetooth.mojom.m.js');
+      '/gen/device/bluetooth/public/mojom/emulation/fake_bluetooth.mojom.m.js');
 
   const map = MOJO_CHOOSER_EVENT_TYPE_MAP;
   const types = content.mojom.ChooserEventType;

@@ -1,3 +1,5 @@
+# mypy: allow-untyped-defs
+
 import argparse
 import json
 import logging
@@ -98,6 +100,31 @@ def get_extra_jobs(event):
                 jobs.add(item.strip())
             break
     return jobs
+
+
+def filter_excluded_users(tasks, event):
+    # Some users' pull requests are excluded from tasks,
+    # such as pull requests from automated exports.
+    try:
+        submitter = event["pull_request"]["user"]["login"]
+    except KeyError:
+        # Just ignore excluded users if the
+        # username cannot be pulled from the event.
+        logger.debug("Unable to read username from event. Continuing.")
+        return
+
+    excluded_tasks = []
+    # A separate list of items for tasks is needed to iterate over
+    # because removing an item during iteration will raise an error.
+    for name, task in list(tasks.items()):
+        if submitter in task.get("exclude-users", []):
+            excluded_tasks.append(name)
+            tasks.pop(name)  # removing excluded task
+    if excluded_tasks:
+        logger.info(
+            f"Tasks excluded for user {submitter}:\n * " +
+            "\n * ".join(excluded_tasks)
+        )
 
 
 def filter_schedule_if(event, tasks):
@@ -222,6 +249,7 @@ def create_tc_task(event, task, taskgroup_id, depends_on_ids, env_extra=None):
         "provisionerId": task["provisionerId"],
         "schedulerId": task["schedulerId"],
         "workerType": task["workerType"],
+        "scopes": task.get("scopes", []),
         "metadata": {
             "name": task["name"],
             "description": task.get("description", ""),
@@ -242,6 +270,10 @@ def create_tc_task(event, task, taskgroup_id, depends_on_ids, env_extra=None):
     }
     if "extra" in task:
         task_data["extra"].update(task["extra"])
+    if task.get("privileged"):
+        if "capabilities" not in task_data["payload"]:
+            task_data["payload"]["capabilities"] = {}
+        task_data["payload"]["capabilities"]["privileged"] = True
     if env_extra:
         task_data["payload"]["env"].update(env_extra)
     if depends_on_ids:
@@ -263,6 +295,7 @@ def get_artifact_data(artifact, task_id_map):
 def build_task_graph(event, all_tasks, tasks):
     task_id_map = OrderedDict()
     taskgroup_id = os.environ.get("TASK_ID", taskcluster.slugId())
+    sink_task_depends_on = []
 
     def add_task(task_name, task):
         depends_on_ids = []
@@ -282,6 +315,11 @@ def build_task_graph(event, all_tasks, tasks):
                                             env_extra=env_extra)
         task_id_map[task_name] = (task_id, task_data)
 
+        # The string conversion here is because if we use variables they are
+        # converted to a string, so it's easier to use a string always
+        if str(task.get("required", "True")) != "False" and task_name != "sink-task":
+            sink_task_depends_on.append(task_id)
+
     for task_name, task in tasks.items():
         if task_name == "sink-task":
             # sink-task will be created below at the end of the ordered dict,
@@ -297,10 +335,9 @@ def build_task_graph(event, all_tasks, tasks):
     sink_task = tasks.get("sink-task")
     if sink_task:
         logger.info("Scheduling sink-task")
-        depends_on_ids = [x[0] for x in task_id_map.values()]
-        sink_task["command"] += " {0}".format(" ".join(depends_on_ids))
+        sink_task["command"] += " {}".format(" ".join(sink_task_depends_on))
         task_id_map["sink-task"] = create_tc_task(
-            event, sink_task, taskgroup_id, depends_on_ids)
+            event, sink_task, taskgroup_id, sink_task_depends_on)
     else:
         logger.info("sink-task is not scheduled")
 
@@ -317,7 +354,7 @@ def get_event(queue, event_path):
         try:
             with open(event_path) as f:
                 event_str = f.read()
-        except IOError:
+        except OSError:
             logger.error("Missing event file at path %s" % event_path)
             raise
     elif "TASK_EVENT" in os.environ:
@@ -338,6 +375,7 @@ def decide(event):
 
     triggered_tasks = filter_triggers(event, all_tasks)
     scheduled_tasks = filter_schedule_if(event, triggered_tasks)
+    filter_excluded_users(scheduled_tasks, event)
 
     logger.info("UNSCHEDULED TASKS:\n  %s" % "\n  ".join(sorted(set(all_tasks.keys()) -
                                                             set(scheduled_tasks.keys()))))

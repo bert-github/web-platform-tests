@@ -1,7 +1,9 @@
-import mock
+# mypy: allow-untyped-defs
+
 import tempfile
 import shutil
 import sys
+from unittest import mock
 
 import pytest
 
@@ -31,7 +33,7 @@ def venv():
         def install(self, *requirements):
             return
 
-        def install_requirements(self, requirements_path):
+        def install_requirements(self, *requirements):
             return
 
     venv = Virtualenv()

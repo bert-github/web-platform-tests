@@ -4,7 +4,7 @@ components:
     workerType: ci
     schedulerId: taskcluster-github
     deadline: "24 hours"
-    image: webplatformtests/wpt:0.46
+    image: ghcr.io/web-platform-tests/wpt:1
     maxRunTime: 7200
     artifacts:
       public/results:
@@ -17,11 +17,12 @@ components:
 
   wpt-testharness:
     chunks: 16
+    maxRunTime: 10800
     vars:
       test-type: testharness
 
   wpt-reftest:
-    chunks: 5
+    chunks: 6
     vars:
       test-type: reftest
 
@@ -103,22 +104,35 @@ components:
 
   browser-chrome: {}
 
+  browser-chromium: {}
+
   browser-servo: {}
 
-  tox-python3:
-    env:
-      TOXENV: py36
-      PY_COLORS: 0
+  browser-firefox_android:
+    privileged: true
+    scopes:
+      - "docker-worker:capability:privileged"
+    chunks-override:
+      testharness: 30
 
-  tox-python38:
+  tox-python3_8:
     env:
       TOXENV: py38
-      PY_COLORS: 0
+      PY_COLORS: "0"
     install:
       - python3.8
       - python3.8-distutils
       - python3.8-dev
+      - python3.8-venv
 
+  tox-python3_12:
+    env:
+      TOXENV: py312
+      PY_COLORS: "0"
+    install:
+      - python3.12
+      - python3.12-dev
+      - python3.12-venv
   tests-affected:
     options:
       browser:
@@ -166,16 +180,22 @@ tasks:
                 - trigger-push
             - vars:
                 # Chromium ToT
-                browser: chrome
+                browser: chromium
                 channel: nightly
               use:
                 - trigger-daily
                 - trigger-push
             - vars:
                 browser: chrome
-                channel: dev
+                channel: canary
               use:
                 - trigger-master
+                - trigger-push
+            - vars:
+                browser: chrome
+                channel: dev
+              use:
+                - trigger-weekly
                 - trigger-push
             - vars:
                 browser: chrome
@@ -209,6 +229,12 @@ tasks:
                 - trigger-push
             - vars:
                 browser: servo
+                channel: nightly
+              use:
+                - trigger-daily
+                - trigger-push
+            - vars:
+                browser: firefox_android
                 channel: nightly
               use:
                 - trigger-daily
@@ -254,16 +280,22 @@ tasks:
                 - trigger-push
             - vars:
                 # Chromium ToT
-                browser: chrome
+                browser: chromium
                 channel: nightly
               use:
                 - trigger-daily
                 - trigger-push
             - vars:
                 browser: chrome
-                channel: dev
+                channel: canary
               use:
                 - trigger-master
+                - trigger-push
+            - vars:
+                browser: chrome
+                channel: dev
+              use:
+                - trigger-weekly
                 - trigger-push
             - vars:
                 browser: chrome
@@ -295,9 +327,15 @@ tasks:
         - vars:
             browser: firefox
             channel: nightly
+            stability-exclude-users:
+              - moz-wptsync-bot
+            required: true
         - vars:
             browser: chrome
             channel: dev
+            stability-exclude-users:
+              - chromium-wpt-export-bot
+            required: false
       do:
         - wpt-${vars.browser}-${vars.channel}-stability:
             use:
@@ -321,6 +359,8 @@ tasks:
               --verify-repeat-loop=0
               --verify-repeat-restart=10
               --github-checks-text-file="/home/test/artifacts/checkrun.md"
+            exclude-users: ${vars.stability-exclude-users}
+            required: ${vars.required}
 
         - wpt-${vars.browser}-${vars.channel}-results:
             use:
@@ -397,30 +437,13 @@ tasks:
           - update_built
       command: "./tools/ci/ci_built_diff.sh"
 
-  - tools/ unittests (Python 3.6):
-      description: >-
-        Unit tests for tools running under Python 3.6, excluding wptrunner
-      use:
-        - wpt-base
-        - trigger-pr
-        - tox-python3
-      command: ./tools/ci/ci_tools_unittest.sh
-      install:
-        - python3.6
-        - python3.6-dev
-      env:
-        HYPOTHESIS_PROFILE: ci
-      schedule-if:
-        run-job:
-          - tools_unittest
-
   - tools/ unittests (Python 3.8):
       description: >-
         Unit tests for tools running under Python 3.8, excluding wptrunner
       use:
         - wpt-base
         - trigger-pr
-        - tox-python38
+        - tox-python3_8
       command: ./tools/ci/ci_tools_unittest.sh
       env:
         HYPOTHESIS_PROFILE: ci
@@ -428,29 +451,19 @@ tasks:
         run-job:
           - tools_unittest
 
-  - tools/ integration tests (Python 3.6):
+  - tools/ unittests (Python 3.12):
       description: >-
-        Integration tests for tools running under Python 3.6
+        Unit tests for tools running under Python 3.12, excluding wptrunner
       use:
         - wpt-base
         - trigger-pr
-        - tox-python3
-      command: ./tools/ci/ci_tools_integration_test.sh
-      install:
-        - libnss3-tools
-        - python3.6
-        - python3.6-dev
-      options:
-        oom-killer: true
-        browser:
-          - firefox
-          - chrome
-        channel: experimental
-        xvfb: true
-        hosts: true
+        - tox-python3_12
+      command: ./tools/ci/ci_tools_unittest.sh
+      env:
+        HYPOTHESIS_PROFILE: ci
       schedule-if:
         run-job:
-          - wpt_integration
+          - tools_unittest
 
   - tools/ integration tests (Python 3.8):
       description: >-
@@ -458,7 +471,7 @@ tasks:
       use:
         - wpt-base
         - trigger-pr
-        - tox-python38
+        - tox-python3_8
       command: ./tools/ci/ci_tools_integration_test.sh
       install:
         - libnss3-tools
@@ -474,26 +487,27 @@ tasks:
         run-job:
           - wpt_integration
 
-  - resources/ tests (Python 3.6):
+  - tools/ integration tests (Python 3.12):
       description: >-
-        Tests for testharness.js and other files in resources/ under Python 3.6
+        Integration tests for tools running under Python 3.12
       use:
         - wpt-base
         - trigger-pr
-        - tox-python3
-      command: ./tools/ci/ci_resources_unittest.sh
+        - tox-python3_12
+      command: ./tools/ci/ci_tools_integration_test.sh
       install:
         - libnss3-tools
-        - python3.6
-        - python3.6-dev
       options:
+        oom-killer: true
         browser:
           - firefox
+          - chrome
+        channel: experimental
         xvfb: true
         hosts: true
       schedule-if:
         run-job:
-          - resources_unittest
+          - wpt_integration
 
   - resources/ tests (Python 3.8):
       description: >-
@@ -501,7 +515,7 @@ tasks:
       use:
         - wpt-base
         - trigger-pr
-        - tox-python38
+        - tox-python3_8
       command: ./tools/ci/ci_resources_unittest.sh
       install:
         - libnss3-tools
@@ -514,7 +528,26 @@ tasks:
         run-job:
           - resources_unittest
 
-  - infrastructure/ tests (Python 3):
+  - resources/ tests (Python 3.12):
+      description: >-
+        Tests for testharness.js and other files in resources/ under Python 3.12
+      use:
+        - wpt-base
+        - trigger-pr
+        - tox-python3_12
+      command: ./tools/ci/ci_resources_unittest.sh
+      install:
+        - libnss3-tools
+      options:
+        browser:
+          - firefox
+        xvfb: true
+        hosts: true
+      schedule-if:
+        run-job:
+          - resources_unittest
+
+  - infrastructure/ tests:
       description: >-
         Smoketests for wptrunner
       vars:
@@ -523,6 +556,7 @@ tasks:
         - wpt-base
         - trigger-pr
         - browser-firefox
+        - browser-firefox_android
       command: ./tools/ci/ci_wptrunner_infrastructure.sh
       install:
         - python3-pip
@@ -534,6 +568,7 @@ tasks:
         browser:
           - firefox
           - chrome
+          - firefox_android
         channel: experimental
         xvfb: true
         hosts: false

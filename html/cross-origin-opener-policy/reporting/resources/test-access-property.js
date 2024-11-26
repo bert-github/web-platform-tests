@@ -1,7 +1,3 @@
-const directory = "/html/cross-origin-opener-policy/reporting";
-const executor_path = directory + "/resources/executor.html?pipe=";
-const coep_header = '|header(Cross-Origin-Embedder-Policy,require-corp)';
-
 const same_origin = get_host_info().HTTPS_ORIGIN;
 const cross_origin = get_host_info().HTTPS_REMOTE_ORIGIN;
 
@@ -11,7 +7,12 @@ const origin = [
 ];
 let escapeComma = url => url.replace(/,/g, '\\,');
 
-let testAccessProperty = (property, op, message) => {
+let testAccessProperty = (
+  property,
+  op,
+  expectReport = true,
+  use_restrict_properties = false,
+) => {
   origin.forEach(([origin_name, origin]) => {
     promise_test(async t => {
       const this_window_token = token();
@@ -25,9 +26,12 @@ let testAccessProperty = (property, op, message) => {
       const openee_token = token();
       const openee_report_token = token();
       const openee_report_to = reportToHeaders(openee_report_token);
+      const coop_ro_header =
+        use_restrict_properties
+          ? openee_report_to.coopReportOnlyRestrictPropertiesHeader
+          : openee_report_to.coopReportOnlySameOriginHeader;
       const openee_url = origin + executor_path + openee_report_to.header +
-        openee_report_to.coopReportOnlySameOriginHeader + coep_header +
-        `&uuid=${openee_token}`;
+        coop_ro_header + coep_header + `&uuid=${openee_token}`;
 
       t.add_cleanup(() => {
         send(opener_token, "window.close()")
@@ -45,10 +49,16 @@ let testAccessProperty = (property, op, message) => {
       // 2. Try to access the openee.
       send(opener_token, `(${op})(openee);`);
 
-      // 3. Check a reports is sent to the opener.
+      // 3. Fetch reports sent to the openee.
       let report = await receiveReport(openee_report_token,
-                                       "access-to-coop-page-from-opener");
-      assert_equals(report.body.property, property);
+        "access-to-coop-page-from-opener");
+      if (expectReport) {
+        assert_equals(report.body.property, property);
+      } else {
+        // "timeout" should be returned if no such reports are received.
+        assert_equals(report, "timeout");
+      }
+
 
     }, `${origin_name} > ${op}`);
   })

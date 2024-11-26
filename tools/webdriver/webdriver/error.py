@@ -1,13 +1,23 @@
+# mypy: allow-untyped-defs
+
 import collections
 import json
+import string
+
+from typing import ClassVar, DefaultDict, Type
 
 
 class WebDriverException(Exception):
-    http_status = None
-    status_code = None
+    # The status_code class variable is used to map the JSON Error Code (see
+    # https://w3c.github.io/webdriver/#errors) to a WebDriverException subclass.
+    # However, http_status need not match, and both are set as instance
+    # variables, shadowing the class variables. TODO: Match on both http_status
+    # and status_code and let these be class variables only.
+    http_status: ClassVar[int]
+    status_code: ClassVar[str]
 
     def __init__(self, http_status=None, status_code=None, message=None, stacktrace=None):
-        super(WebDriverException, self)
+        super().__init__()
 
         if http_status is not None:
             self.http_status = http_status
@@ -17,17 +27,16 @@ class WebDriverException(Exception):
         self.stacktrace = stacktrace
 
     def __repr__(self):
-        return "<%s http_status=%s>" % (self.__class__.__name__, self.http_status)
+        return f"<{self.__class__.__name__} http_status={self.http_status}>"
 
     def __str__(self):
-        message = "%s (%s)" % (self.status_code, self.http_status)
+        message = f"{self.status_code} ({self.http_status})"
 
         if self.message is not None:
-            message += ": %s" % self.message
-        message += "\n"
+            message += ": %s" % self.message.strip(string.whitespace)
 
-        if self.stacktrace:
-            message += ("\nRemote-end stacktrace:\n\n%s" % self.stacktrace)
+        if self.stacktrace is not None:
+            message += ("\n\nRemote-end stacktrace:\n\n%s" % self.stacktrace.strip("\n"))
 
         return message
 
@@ -200,9 +209,10 @@ def from_response(response):
             "Expected 'value' key in response body:\n"
             "%s" % json.dumps(response.body))
 
-    # all fields must exist, but stacktrace can be an empty string
+    # all fields must exist, but both message and stacktrace are
+    # implementation-defined and could be empty
     code = value["error"]
-    message = value["message"]
+    message = value["message"] or None
     stack = value["stacktrace"] or None
 
     cls = get(code)
@@ -217,7 +227,7 @@ def get(error_code):
     return _errors.get(error_code, WebDriverException)
 
 
-_errors = collections.defaultdict()
+_errors: DefaultDict[str, Type[WebDriverException]] = collections.defaultdict()
 for item in list(locals().values()):
-    if type(item) == type and issubclass(item, WebDriverException):
+    if isinstance(item, type) and item != WebDriverException and issubclass(item, WebDriverException):
         _errors[item.status_code] = item

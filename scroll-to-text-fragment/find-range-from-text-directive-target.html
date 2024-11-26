@@ -28,6 +28,9 @@ window.onload = function() {
   }
 </style>
 <body>
+  Won't scroll if matched:
+  match suffix
+  match suffix3
   <div class="spacer"></div>
   <p>
     The quick brown fox jumped over the lazy dog.
@@ -35,6 +38,10 @@ window.onload = function() {
   </p>
   <p>
     foo foo foo bar bar bar
+  </p>
+  <p>
+    match suffix2
+    prefix match suffix3 matchEnd suffix4 matchEnd suffix5
   </p>
   <p>
     Lorem
@@ -62,7 +69,26 @@ window.onload = function() {
 
     Dipsum
 
-
+  <div>Text
+    <div style="display: none">This isn't rendered</div>
+    with display: none
+  </div>
+  <div>Text
+    <div style="visibility: hidden">This also isn't visible</div>
+     with visibility: hidden as block boundary
+    </div>
+  <div>Text
+    <span style="visibility: hidden">This also isn't visible</span>
+      with visibility: hidden as inline
+    </div>
+  <div>Text
+    <iframe srcdoc="Inner Iframe"></iframe>
+    with Iframe
+  </div>
+  <div>Text
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAQAAAAnOwc2AAAAEUlEQVR42mNk+M+AARiHsiAAcCIKAYwFoQ8AAAAASUVORK5CYII=">
+    with image
+  </div>
 
   </p>
   <p>

@@ -31,10 +31,11 @@
 """Tests for http_header_util module."""
 
 from __future__ import absolute_import
+
 import unittest
 import sys
 
-from mod_pywebsocket import http_header_util
+from pywebsocket3 import http_header_util
 
 
 class UnitTest(unittest.TestCase):
@@ -79,7 +80,7 @@ class UnitTest(unittest.TestCase):
 
         host, port, resource = http_header_util.parse_uri(
             'ws://localhost:-1/ws')
-        if sys.version >= '3.6':
+        if sys.hexversion >= 0x030600f0:
             self.assertEqual(None, resource)
         else:
             self.assertEqual('localhost', host)

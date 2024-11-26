@@ -1,3 +1,5 @@
+# mypy: allow-untyped-defs
+
 import argparse
 import logging
 import os
@@ -54,17 +56,10 @@ def read_image_name():
     return taskcluster_values, tests_value
 
 
-def lookup_tag(tag):
-    import requests
-    org, repo_version = tag.split("/", 1)
-    repo, version = repo_version.rsplit(":", 1)
-    resp = requests.get("https://hub.docker.com/v2/repositories/%s/%s/tags/%s" %
-                        (org, repo, version))
-    if resp.status_code == 200:
-        return True
-    if resp.status_code == 404:
-        return False
-    resp.raise_for_status()
+def tag_exists(tag):
+    retcode = subprocess.call(["docker", "manifest", "inspect", tag])
+    # The command succeeds if the tag exists.
+    return retcode != 0
 
 
 def push(venv, tag=None, force=False, *args, **kwargs):
@@ -87,13 +82,13 @@ def push(venv, tag=None, force=False, *args, **kwargs):
         logger.info("Using tag %s from .taskcluster.yml" % taskcluster_tag)
         tag = taskcluster_tag
 
-    tag_re = re.compile(r"webplatformtests/wpt:\d\.\d+")
+    tag_re = re.compile(r"ghcr.io/web-platform-tests/wpt:\d+")
     if not tag_re.match(tag):
-        error_log("Tag doesn't match expected format webplatformtests/wpt:0.x")
+        error_log("Tag doesn't match expected format ghcr.io/web-platform-tests/wpt:x")
         if not force:
             sys.exit(1)
 
-    if lookup_tag(tag):
+    if tag_exists(tag):
         # No override for this case
         logger.critical("Tag %s already exists" % tag)
         sys.exit(1)
@@ -113,6 +108,8 @@ def parser_run():
                         "/home/test/web-platform-tests/")
     parser.add_argument("--privileged", action="store_true",
                         help="Run the image in priviledged mode (required for emulators)")
+    parser.add_argument("--tag", action="store", default="wpt:local",
+                        help="Docker image tag to use (default wpt:local)")
     return parser
 
 
@@ -125,12 +122,13 @@ def run(*args, **kwargs):
                  os.path.join(wpt_root, "tools", "docker", "seccomp.json")])
     if kwargs["privileged"]:
         args.append("--privileged")
+        args.extend(["--device", "/dev/kvm"])
     if kwargs["checkout"]:
         args.extend(["--env", "REF==%s" % kwargs["checkout"]])
     else:
         args.extend(["--mount",
                      "type=bind,source=%s,target=/home/test/web-platform-tests" % wpt_root])
-    args.extend(["-it", "wpt:local"])
+    args.extend(["-it", kwargs["tag"]])
 
     proc = subprocess.Popen(args)
     proc.wait()

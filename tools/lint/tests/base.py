@@ -1,5 +1,4 @@
-from __future__ import unicode_literals
-
+# mypy: allow-untyped-defs
 
 def check_errors(errors):
     for e in errors:

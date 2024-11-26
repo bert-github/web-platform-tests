@@ -1,24 +1,20 @@
-from __future__ import print_function
-
 import base64
 import logging
 import os
-import pytest
 import unittest
 
 from urllib.parse import urlencode, urlunsplit
 from urllib.request import Request as BaseRequest
 from urllib.request import urlopen
 
-from hyper import HTTP20Connection, tls
-import ssl
+import httpx
+import pytest
+
 from localpaths import repo_root
 
 wptserve = pytest.importorskip("wptserve")
 
 logging.basicConfig()
-
-wptserve.logger.set_logger(logging.getLogger())
 
 here = os.path.dirname(__file__)
 doc_root = os.path.join(here, "docroot")
@@ -53,7 +49,7 @@ class TestUsingServer(unittest.TestCase):
                                                    use_ssl=False,
                                                    certificate=None,
                                                    doc_root=doc_root)
-        self.server.start(False)
+        self.server.start()
 
     def tearDown(self):
         self.server.stop()
@@ -82,7 +78,7 @@ class TestUsingServer(unittest.TestCase):
         assert resp.info().get_all(name) == values
 
 
-@pytest.mark.skipif(not wptserve.utils.http2_compatible(), reason="h2 server only works in python 2.7.10+ and Python 3.6+")
+@pytest.mark.skipif(not wptserve.utils.http2_compatible(), reason="h2 server requires OpenSSL 1.0.2+")
 class TestUsingH2Server:
     def setup_method(self, test_method):
         self.server = wptserve.server.WebTestHttpd(host="localhost",
@@ -93,16 +89,13 @@ class TestUsingH2Server:
                                                    certificate=os.path.join(repo_root, "tools", "certs", "web-platform.test.pem"),
                                                    handler_cls=wptserve.server.Http2WebTestRequestHandler,
                                                    http2=True)
-        self.server.start(False)
+        self.server.start()
 
-        context = tls.init_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-        context.set_alpn_protocols(['h2'])
-        self.conn = HTTP20Connection('%s:%i' % (self.server.host, self.server.port), enable_push=True, secure=True, ssl_context=context)
-        self.conn.connect()
+        self.client = httpx.Client(base_url=f'https://{self.server.host}:{self.server.port}',
+                                   http2=True, verify=False)
 
     def teardown_method(self, test_method):
+        self.client.close()
         self.server.stop()
 
 
@@ -125,7 +118,7 @@ class TestWrapperHandlerUsingServer(TestUsingServer):
             os.remove(filename)
 
     def setUp(self):
-        super(TestWrapperHandlerUsingServer, self).setUp()
+        super().setUp()
 
         for filename, content in self.dummy_files.items():
             filepath = os.path.join(doc_root, filename)
@@ -149,7 +142,7 @@ class TestWrapperHandlerUsingServer(TestUsingServer):
             self.assertEqual(fp.read(), resp.read())
 
     def tearDown(self):
-        super(TestWrapperHandlerUsingServer, self).tearDown()
+        super().tearDown()
 
         for filename, _ in self.dummy_files.items():
             filepath = os.path.join(doc_root, filename)

@@ -1,4 +1,4 @@
-// META: global=window,dedicatedworker,jsshell
+// META: global=window,dedicatedworker,jsshell,shadowrealm
 // META: script=/wasm/jsapi/assertions.js
 
 function assert_type(argument) {
@@ -23,4 +23,4 @@ test(() => {
 
 test(() => {
     assert_type({ "minimum": 0, "maximum": 5, "element": "funcref" });
-}, "None-zero maximum");
+}, "Non-zero maximum");

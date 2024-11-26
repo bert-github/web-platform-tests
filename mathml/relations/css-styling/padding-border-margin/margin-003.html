@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>margin</title>
-<link rel="help" href="https://mathml-refresh.github.io/mathml-core/#layout-algorithms">
+<link rel="help" href="https://w3c.github.io/mathml-core/#layout-algorithms">
 <meta name="assert" content="Verify that margin is taken into account on children.">
 <script src="/resources/testharness.js"></script>
 <script src="/resources/testharnessreport.js"></script>
@@ -64,8 +64,8 @@
             for (var i = 0; i < element.children.length; i++) {
                 var childBox = element.children[i].getBoundingClientRect();
                 var referenceChildBox = reference.children[i].getBoundingClientRect();
-                assert_approx_equals(childBox.width + marginLeft + marginRight, referenceChildBox.width, epsilon, "inline size (child ${i})");
-                assert_approx_equals(childBox.height + marginTop + marginBottom, referenceChildBox.height, epsilon, "block size (child ${i})");
+                assert_approx_equals(childBox.width + marginLeft + marginRight, referenceChildBox.width, epsilon, `inline size (child ${i})`);
+                assert_approx_equals(childBox.height + marginTop + marginBottom, referenceChildBox.height, epsilon, `block size (child ${i})`);
 
                 assert_approx_equals(childBox.left - marginLeft - elementBox.left,
                                      referenceChildBox.left - referenceBox.left,

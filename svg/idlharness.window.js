@@ -42,9 +42,9 @@ const elements = [
   'script',
   'animate',
   'set',
+  'discard',
   'animateMotion',
   'mpath',
-  'animateColor',
   'animateTransform',
   'metadata',
   'foreignObject',
@@ -77,7 +77,7 @@ const elements = [
 ];
 
 idl_test(
-  ['SVG'],
+  ['SVG', 'svg-animations'],
   ['cssom', 'web-animations', 'html', 'dom'],
   idlArray => {
     const svgUrl = 'http://www.w3.org/2000/svg';
@@ -167,10 +167,10 @@ idl_test(
       SVGViewElement: ['objects.view'],
       SVGScriptElement: ['objects.script'],
       SVGAnimateElement: ['objects.animate'],
+      SVGDiscardElement: ['objects.discard'],
       SVGSetElement: ['objects.set'],
       SVGAnimateMotionElement: ['objects.animateMotion'],
       SVGMPathElement: ['objects.mpath'],
-      SVGAnimateColorElement: ['objects.animateColor'],
       SVGAnimateTransformElement: ['objects.animateTransform'],
       SVGMetadataElement: ['objects.metadata'],
       SVGForeignObjectElement: ['objects.foreignObject'],

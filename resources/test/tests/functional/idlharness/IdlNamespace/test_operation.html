@@ -2,10 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="variant" content="">
-  <meta name="variant" content="?keep-promise">
   <title>idlharness: namespace operation</title>
-  <script src="../../../../variants.js"></script>
   <script src="/resources/testharness.js"></script>
   <script src="/resources/testharnessreport.js"></script>
   <script src="/resources/WebIDLParser.js"></script>
@@ -58,13 +55,13 @@ var idlArray = new IdlArray();
 idlArray.add_idls(`
 [Exposed=Window]
 namespace foo {
-  void Truth();
-  void Lies();
+  undefined Truth();
+  undefined Lies();
 };
 [Exposed=Window]
 namespace bar {
   [LegacyUnforgeable]
-  void Truth();
+  undefined Truth();
 };
 [Exposed=Window]
 namespace baz {
